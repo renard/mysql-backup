@@ -1,0 +1,400 @@
+#!/bin/bash
+
+# mysql-backup --- Backup mysql databases
+# Copyright © 2010 Sébastien Gross <seb•ɑƬ•chezwam•ɖɵʈ•org>
+# Last changed: 2010-09-06 15:42:05
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+VERSION="1.0"
+
+# Default values just in case of...
+
+# Backup options
+BACKUP_DIR=/var/lib/mysql-backup
+DATABASES="ALL"
+IGNORE_DATABASES=(information_schema)
+COMPRESSION=gzip
+COMPRESSION_OPTS=
+DAILY_RETENTION=7
+WEEKLY_DAY="1"
+WEEKLY_RETENTION=35
+MONTHLY_DAY="01"
+MONTHLY_RETENTION=365
+pre_backup_hook=
+post_backup_hook=
+pre_restore_hook=
+post_restore_hook=
+
+
+# mysql / mysqldump default configuration
+batch=1
+skip_column_names=1
+quote_names=1
+opt=1
+add_drop_database=1
+
+# Commands
+mysql=$(which mysql)
+mysqldump=$(which mysqldump)
+sed=$(which sed)
+sort=$(which sort)
+uniq=$(which uniq)
+tail=$(which tail)
+run_parts=$(which run-parts)
+
+# Useful variables
+mysql_cli=
+mysqldump_cli=
+compression_cli=
+extract_cli=
+backup_extension=
+
+# Command line options
+cli_config=
+cli_verbose=
+
+
+RET=
+
+# Load default values
+for f in /etc/mysql-backup/default.cnf ~/.mysql-backup.cnf .mysql-backup.cnf; do
+    if test -r ${f}; then
+	break
+    fi
+done
+
+function die() {
+  echo "$@" >&2
+  exit 1
+}
+
+function log() {
+    d=$(dirname "${backup_log}")
+    test -d "${d}" || mkdir "${d}"
+    echo "$(date +'%F %T') $*" >> "${backup_log}"
+    test -n "${cli_verbose}" && echo "$(date +'%F %T') $*"
+}
+
+function run_hook() {
+    hook=$1
+    log "Running hook ${hook}"
+
+    if test -n "${!hook}" -a -d "${!hook}"; then
+	${run_parts} "${!hook}"
+    fi
+}
+
+
+
+function usage() {
+    exit_code=${1:-1}
+    cat <<EOF
+mysql-backup Version ${VERSION}
+Copyright © 2010 Sébastien Gross <seb•ɑƬ•chezwam•ɖɵʈ•org>
+
+$0 [ options ] command [ command options ]
+
+Options:
+
+  -c|--config   CONF   The configuration file to use instead of default.
+  -v|--verbose         Run in verbose mode.
+  -h|--help            This help screen.
+
+Commands:
+
+  backup             Do the backups
+    --dry-run          Only print what would be done.
+
+  restore            Restore a backup
+    --dry-run          Only print what would be done.
+    --date      DATE   Restore backup for a given date.
+    --bases     BASES  Restore backup for a given set of bases.
+
+EOF
+    exit ${exit_code}
+}
+
+# Parse the command line
+command=
+while test $# != 0 && test -z "$command"; do
+    case "$1" in
+	backup|restore) command=cmd_$1;;
+        -c|--config)
+            test -z "$2" && die "Need a parameter for $1."
+            cli_config=$2
+            shift
+            ;;
+        -v|--verbose) cli_verbose=1 ;;
+        --help|-h) usage 0 ;;
+	--) shift; break ;;
+        -*|*) usage ;;
+    esac
+    shift
+done
+
+# Finally load configuration file.
+if test -r "${cli_config}"; then
+    source "${cli_config}"
+fi
+
+backup_dir="${BACKUP_DIR}/${host}"
+backup_log="${backup_dir}/log"
+
+# Build mysql command line
+function build_mysql_cli() {
+    RET="${mysql}"
+    # missing help table version
+    for v in auto-rehash batch column-names column-type-info comments \
+	compress debug-check debug-info disable-named-commands force \
+	html ignore-spaces line-numbers named-commands no-auto-rehash \
+	no-beep no-named-commands no-pager no-tee one-database quick \
+	raw reconnect safe-updates i-am-a-dummy secure-auth show-warnings \
+	sigint-ignore silent skip-column-names skip-line-numbers unbuffered \
+	verbose vertical wait xml ; do
+	V=${v//-/_}
+	test -z "${!V}" || RET="${RET} --${v}"
+    done
+    # Missing databases execute pipe
+    for v in character-sets-dir debug default-character-set delimiter host \
+	local-infile pager password port prompt protocol socket tee user ; do
+	V=${v//-/_}
+	test -z "${!V}" || RET="${RET} --${v}=${!V}"
+    done
+    mysql_cli=${RET}
+}
+
+# Build mysql dump command line
+function build_mysqldump_cli() {
+    RET="${mysqldump}"
+    # missing help pipe table version 
+    for v in add-drop-database add-drop-table add-locks allow-keywords \
+	comments compact complete-insert compress create-options \
+	debug-check debug-info delayed-insert delete-master-logs disable-keys \
+	dump-date events extended-insert flush-logs flush-privileges force \
+	hex-blob insert-ignore lock-all-tables lock-tables \
+	no-autocommit no-create-db no-create-info no-data no-set-names opt \
+	order-by-primary quick quote-names replace routines set-charset \
+	single-transaction skip-comments skip-opt triggers tz-utc verbose xml ; do
+	V=${v//-/_}
+	test -z "${!V}" || RET="${RET} --${v}"
+    done
+    # Missing database ignore-table  ssl*
+    for v in character-sets-dir compatible debug default-character-set \
+	fields-terminated-by fields-enclosed-by fields-optionally-enclosed-by \
+	fields-escaped-by host lines-terminated-by log-error master-data \
+	password port protocol result-file socket tab user where; do
+	V=${v//-/_}
+	test -z "${!V}" || RET="${RET} --${v}=${!V}"
+    done
+    mysqldump_cli=${RET}
+}
+
+# list databases to backup
+function find_db () {
+    if test "${DATABASES}" == "ALL"; then
+	dbs=$(${mysql_cli} -e "SHOW DATABASES" | ${sed} 's/ /%/g')
+    fi
+    DATABASES=""
+    # Check is database is in the ignore list, then remove it from DATABASES.
+    for db in ${dbs}; do
+	skip_this_db=
+	for i in ${IGNORE_DATABASES[@]}; do
+	    if test ${db} == ${i}; then
+		skip_this_db=1
+	    fi
+	done
+	if test -z "${skip_this_db}"; then
+	    DATABASES="${DATABASES} ${db}"
+	fi
+    done
+}
+
+function build_compression_cli () {
+    case ${COMPRESSION} in
+	gzip) 
+	    compression_cli="${COMPRESSION}"
+	    extract_cli=$(which zcat)
+	    backup_extension=".gz"
+	    ;;
+	bzip2)
+	    compression_cli="${COMPRESSION}"
+	    extract_cli=$(which bzcat)
+	    backup_extension=".bz2"
+	    ;;
+	xz)
+	    compression_cli="${COMPRESSION}"
+	    extract_cli=$(which xzcat)
+	    backup_extension=".xz"
+	    ;;
+	*) 
+	    compression_cli=$(which cat)
+	    extract_cli=$(which cat)
+	    backup_extension=""
+	    ;;
+    esac
+    backup_extension="sql${backup_extension}"
+}
+
+function get_backup_file () {
+    db=${1}
+    timestamp=$(date +%F)
+    RET="${db}_${timestamp}.${backup_extension}"
+}
+
+
+function cmd_backup() {
+    find_db
+    local dry_run=
+    while test $# -ne 0; do
+	case "$1" in
+	    --dry-run) dry_run=1 ;;
+	    --) shift ; break ;;
+	    -*|*) help 0 ;;
+	esac
+	shift
+    done
+
+    test -z "${dry_run}" && log "DAILY backup start"
+    test -z "${dry_run}" && run_hook pre_backup_hook
+    for db in ${DATABASES}; do
+	for t in daily weekly monthly; do
+	    mkdir -p "${backup_dir}/${t}"
+	done
+	test -z "${dry_run}" && log "${db} start"
+	test -z "${dry_run}" && run_hook pre_backup_hook_${db}
+	get_backup_file ${db}
+	backup_file=${RET}
+	if test -n "${dry_run}"; then
+	    echo "${mysqldump_cli} --databases ${db} | ${compression_cli} > \"${backup_dir}/daily/${backup_file}\""
+	    continue
+	fi
+	${mysqldump_cli} --databases ${db} | ${compression_cli} > "${backup_dir}/daily/${backup_file}"
+
+	# Keep weekly archives
+	if test "$(date +%w)" == "${WEEKLY_DAY}"; then
+	    log "${db} weekly"
+	    ln -f "${backup_dir}/daily/${backup_file}" "${backup_dir}/weekly/${backup_file}"
+	fi
+	# remove old weekly archives
+	find "${backup_dir}/weekly" -type f -mtime +${WEEKLY_RETENTION} -print0 | \
+	    xargs -0 --no-run-if-empty rm
+
+	# Keep monthly archives
+	if test "$(date +%d)" == "${MONTHLY_DAY}"; then
+	    log "${db} monthly"
+	    ln -f "${backup_dir}/daily/${backup_file}" "${backup_dir}/monthly/${backup_file}"
+	fi
+	# remove old monthly archives
+	find "${backup_dir}/monthly" -type f -mtime +${MONTHLY_RETENTION} -print0 | \
+	    xargs -0 --no-run-if-empty rm
+
+	# remove old daily archives
+	find "${backup_dir}/daily" -type f -mtime +${DAILY_RETENTION} -print0 | \
+	    xargs -0 --no-run-if-empty rm
+	run_hook pre_backup_hook_${db}
+	log "${db} done"
+    done
+    test -z "${dry_run}" && run_hook post_backup_hook
+    test -z "${dry_run}" && log "DAILY backup done"
+}
+
+
+# Retrieve last backup day.
+function find_last_backup_date() {
+    RET=$(find "${backup_dir}" -type f -name '*.sql*' | \
+	${sed} -n 's,^.*/[^/]\+_\([0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}\)[^/]*$,\1,p' | \
+	${sort} | ${tail} -n1)
+}
+
+
+# Retrieve bases.
+function find_backup_bases() {
+    RET=$(find "${backup_dir}" -type f -name '*.sql*' | \
+	${sed} -n 's,^.*/\([^/]\+\)_[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}[^/]*$,\1,p' | \
+	${sort} | ${uniq} )
+}
+
+
+# This has to be done
+function cmd_restore() {
+    local dry_run=
+    local date=
+    local bases=
+    while test $# -ne 0; do
+	case "$1" in
+	    --dry-run) dry_run=1 ;;
+	    --date) test -z "$2" && die "Need a parameter for $1."
+		date=$2
+		shift
+		;;
+	    --bases) test -z "$2" && die "Need a parameter for $1."
+		bases=$2
+		shift
+		;;
+	    --) shift ; break ;;
+	    -*|*) help 0 ;;
+	esac
+	shift
+    done
+
+    if test -z "${date}"; then
+	find_last_backup_date
+	date=${RET}
+    fi
+
+    if test -z "${bases}"; then
+	find_backup_bases
+	bases=${RET}
+    fi
+    test -z "${dry_run}" && run_hook pre_restore_hook
+    for base in ${bases}; do
+	file_to_restore=
+	for t in daily weekly monthly; do
+	    file_to_restore="${backup_dir}/${t}/${base}_${date}.${backup_extension}"
+	    if test -r "${file_to_restore}"; then
+		break
+	    else
+		file_to_restore=
+	    fi
+	done
+	if test -z "${file_to_restore}"; then
+	    echo "Could not find a backup archive for ${base} on ${date}."
+	    continue
+	fi
+	if test -n "${dry_run}"; then
+	    echo "${extract_cli} \"${file_to_restore}\" | ${mysql_cli}"
+	else
+	    ### COPY PREVIOUS LINE WITHOUT ECHO
+	    run_hook pre_restore_hook_${base}
+	    log "Restoring ${base} from ${date} on ${host}."
+	    echo "DO REAL RESTORE"
+	    log "Restoring ${base} from ${date} on ${host} done."
+	    run_hook post_restore_hook_${base}
+	fi
+    done
+    test -z "${dry_run}" && run_hook post_restore_hook
+}
+
+
+# main
+
+build_mysql_cli
+build_mysqldump_cli
+build_compression_cli
+
+test -z "${command}" && die "No command specified"
+"${command}" "$@"
+
+exit

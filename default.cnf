@@ -1,0 +1,24 @@
+# Default mysql-backup configuration
+
+# Backup options
+BACKUP_DIR=/var/lib/mysql-backup
+DATABASES="ALL"
+IGNORE_DATABASES=(information_schema)
+COMPRESSION=gzip
+COMPRESSION_OPTS=
+DAILY_RETENTION=7
+WEEKLY_DAY="1"
+WEEKLY_RETENTION=35
+MONTHLY_DAY="01"
+MONTHLY_RETENTION=365
+pre_backup_hook=
+post_backup_hook=
+pre_restore_hook=
+post_restore_hook=
+
+# mysql / mysqldump default configuration
+batch=1
+skip_column_names=1
+quote_names=1
+opt=1
+add_drop_database=1

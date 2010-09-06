@@ -1,0 +1,506 @@
+'\" t
+.\"     Title: mysql-backup
+.\"    Author: [see the "AUTHORS" section]
+.\" Generator: DocBook XSL Stylesheets v1.75.2 <http://docbook.sf.net/>
+.\"      Date: 09/06/2010
+.\"    Manual: \ \&
+.\"    Source: \ \&
+.\"  Language: English
+.\"
+.TH "MYSQL\-BACKUP" "1" "09/06/2010" "\ \&" "\ \&"
+.\" -----------------------------------------------------------------
+.\" * Define some portability stuff
+.\" -----------------------------------------------------------------
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.\" http://bugs.debian.org/507673
+.\" http://lists.gnu.org/archive/html/groff/2009-02/msg00013.html
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.ie \n(.g .ds Aq \(aq
+.el       .ds Aq '
+.\" -----------------------------------------------------------------
+.\" * set default formatting
+.\" -----------------------------------------------------------------
+.\" disable hyphenation
+.nh
+.\" disable justification (adjust text to left margin only)
+.ad l
+.\" -----------------------------------------------------------------
+.\" * MAIN CONTENT STARTS HERE *
+.\" -----------------------------------------------------------------
+.SH "NAME"
+mysql-backup \- Backup MySQL databases\&.
+.SH "SYNOPSIS"
+.sp
+.nf
+mysql\-backup [ options ] command [ command options ]
+.fi
+.SH "DESCRIPTION"
+.sp
+mysql\-backup performs daily, weekly and monthly backup of MySQL databases\&. Features:
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+Backup multiple databases
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+Compress backup files
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+Backup remote servers
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+Rotate backups
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+Perform restoration
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+more\&...
+.RE
+.SH "ARGUMENTS"
+.SS "Options"
+.PP
+\-c CONFIG , \-\-config CONFIG
+.RS 4
+A configuration file to use instead of default one\&. This option allows different configuration for different MySQL servers\&.
+.RE
+.PP
+\-v, verbose
+.RS 4
+Run in verbose mode\&.
+.RE
+.PP
+\-h, \-\-help
+.RS 4
+Show a short help screen\&.
+.RE
+.SS "Commands"
+.sp
+There are only two commands:
+.PP
+backup
+.RS 4
+Perform the backup\&.
+.RE
+.PP
+restore
+.RS 4
+Performs the restoration of a previously done backup\&.
+.RE
+.SS "Command options"
+.sp
+Each command has its own set of options\&.
+.sp
+.it 1 an-trap
+.nr an-no-space-flag 1
+.nr an-break-flag 1
+.br
+.ps +1
+\fBbackup options\fR
+.RS 4
+.PP
+\-\-dry\-run
+.RS 4
+Run backup in a dry\-run mode: nothing would be done for real\&. Commands to run are displayed on the screen\&.
+.RE
+.RE
+.sp
+.it 1 an-trap
+.nr an-no-space-flag 1
+.nr an-break-flag 1
+.br
+.ps +1
+\fBRestore options\fR
+.RS 4
+.PP
+\-\-dry\-run
+.RS 4
+Run restore in a dry\-run mode: nothing would be done for real\&. Commands to run are displayed on the screen\&.
+.RE
+.PP
+\-\-date DATE
+.RS 4
+Restore backups for given date\&. If this option is not set, the last found backup would be restored\&.
+.RE
+.PP
+\-\-bases BASES
+.RS 4
+Restore backups for given set of databases\&. If this option is not set all found databases would be restored\&.
+.RE
+.RE
+.SH "CONFIGURATION FILE"
+.SS "Default configuration"
+.sp
+mysql\-backup looks for a default configuration file in that order:
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+
+\fI/etc/mysql\-backup/default\&.cnf\fR
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+
+\fI~/\&.mysql\-backup\&.cnf\fR
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+
+\fI\&./\&.mysql\-backup\&.cnf\fR
+.RE
+.sp
+If no default configuration file is found, default hard\-coded values would be used\&.
+.SS "Specific configuration file"
+.sp
+In addition of the default configuration, a specific configuration file can be used (with the \fB\-\-conf\fR option)\&.
+.sp
+.it 1 an-trap
+.nr an-no-space-flag 1
+.nr an-break-flag 1
+.br
+.ps +1
+\fBGeneral options\fR
+.RS 4
+.PP
+BACKUP_DIR
+.RS 4
+Where the backups files would be stored\&. A generic backup file schema is:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+<BACKUP_DIR>/<host>/<daily|weekly|monthly>/<base>_YYYY\-MM\-DD\&.sql[\&.<COMPRESSION_EXTENSION>]
+.fi
+.if n \{\
+.RE
+.\}
+.RE
+.RE
+.sp
+.it 1 an-trap
+.nr an-no-space-flag 1
+.nr an-break-flag 1
+.br
+.ps +1
+\fBMySQL options\fR
+.RS 4
+.PP
+DATABASES
+.RS 4
+Databases to backup\&. If this value is set to
+\fBALL\fR
+then all databases would be backuped\&.
+mysql\-backup
+would determine the database using the "SHOW DATABASES" query\&.
+.RE
+.PP
+IGNORE_DATABASES
+.RS 4
+A list of database to ignore during backup\&. By default,
+\fBinformation_schema\fR
+is ignored\&.
+.RE
+.sp
+In addition to that option all mysql(1) and mysqldump(1) options are also recognized as long as dash (\fB\-\fR) are changed to underscore (\fB_\fR)\&.
+.if n \{\
+.sp
+.\}
+.RS 4
+.it 1 an-trap
+.nr an-no-space-flag 1
+.nr an-break-flag 1
+.br
+.ps +1
+\fBNote\fR
+.ps -1
+.br
+.sp
+However some options are not recognized: \fBhelp\fR, \fBpipe\fR, \fBtable\fR, \fBversion\fR, \fBdatabases\fR, \fBignore\-table\fR, \fBssl\fR*, \fBexecute\fR\&.
+.sp .5v
+.RE
+.sp
+EXAMPLE: This is the default MySQL configuration:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+batch=1
+skip_column_names=1
+quote_names=1
+opt=1
+add_drop_database=1
+.fi
+.if n \{\
+.RE
+.\}
+.RE
+.sp
+.it 1 an-trap
+.nr an-no-space-flag 1
+.nr an-break-flag 1
+.br
+.ps +1
+\fBArchive options\fR
+.RS 4
+.PP
+COMPRESSION
+.RS 4
+The tool to use for compression\&. Currently
+\fBgzip\fR,
+\fBbzip2\fR
+and
+\fBxz\fR
+are recognized\&. If compression if not known then no compression would be used\&.
+.RE
+.if n \{\
+.sp
+.\}
+.RS 4
+.it 1 an-trap
+.nr an-no-space-flag 1
+.nr an-break-flag 1
+.br
+.ps +1
+\fBNote\fR
+.ps -1
+.br
+.sp
+\fBgzip\fR generates bigger files than the others but needs less CPU time\&.
+.sp .5v
+.RE
+.PP
+COMPRESSION_OPTS
+.RS 4
+Options to pass to the compression tool\&.
+.RE
+.PP
+DAILY_RETENTION
+.RS 4
+How many days a daily backup should be kept\&. By default daily archives are kept 7 days\&.
+.RE
+.PP
+WEEKLY_RETENTION
+.RS 4
+How many days a weekly backup should be kept\&. By default weekly archives are kept 35 days (5 weeks)\&.
+.RE
+.PP
+MONTHLY_RETENTION
+.RS 4
+How many days a monthly backup should be kept\&. By default monthly archives are kept 365 days (12 months)\&.
+.RE
+.PP
+WEEKLY_DAY
+.RS 4
+Which day weekly backup are done (0\&.\&.6, 0 is Sunday)\&.
+.RE
+.PP
+MONTHLY_DAY
+.RS 4
+Which day monthly backup are done (00\&.\&.31)\&.
+.RE
+.RE
+.sp
+.it 1 an-trap
+.nr an-no-space-flag 1
+.nr an-break-flag 1
+.br
+.ps +1
+\fBHooks\fR
+.RS 4
+.sp
+Hooks are scripts that can be run via \fBrun\-parts\fR(1)\&.
+.PP
+pre_backup_hook
+.RS 4
+Hook to be run before the backup process really starts\&.
+.RE
+.PP
+post_backup_hook
+.RS 4
+Hook to be run after the backup process is done\&.
+.RE
+.PP
+pre_restore_hook
+.RS 4
+Hook to be run before the restore process really starts\&.
+.RE
+.PP
+post_restore_hook
+.RS 4
+Hook to be run after the restore process is done\&.
+.RE
+.if n \{\
+.sp
+.\}
+.RS 4
+.it 1 an-trap
+.nr an-no-space-flag 1
+.nr an-break-flag 1
+.br
+.ps +1
+\fBNote\fR
+.ps -1
+.br
+.sp
+In addition hook names could be postfixed with a database name\&. This means a hook could be defined for a specific database\&.
+.sp .5v
+.RE
+.sp
+EXAMPLE: \fBpost_backup_hook_a_database\fR is ran before \fBa_database\fR would be backuped\&.
+.sp
+See \fBrun\-parts\fR(8) for further information on how hooks are run\&.
+.RE
+.SH "ARCHIVE PROCEDURE"
+.sp
+Every day backups are done in the \fBdaily\fR directory\&. On \fBWEEKLY_DAY\fR the daily backup is hard linked to the \fBweekly\fR directory (the same is done for monthly backups on \fBMONTHLY_DAY\fR and \fBmonthly\fR directory)\&.
+.sp
+After that archives older that \fBDAILY_RETENTION\fR, \fBWEEKLY_RETENTION\fR and \fBMONTHLY_RETENTION\fR are removed from their specific directories\&.
+.sp
+This system keeps space on the backup server by the use of hard links\&.
+.if n \{\
+.sp
+.\}
+.RS 4
+.it 1 an-trap
+.nr an-no-space-flag 1
+.nr an-break-flag 1
+.br
+.ps +1
+\fBNote\fR
+.ps -1
+.br
+.sp
+This only woks if all backups are in a single partition\&.
+.sp .5v
+.RE
+.SH "SEE ALSO"
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+mysql(1)
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+mysqldump(1)
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+gzip(1), bzip2(1), xz(1)
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+run\-parts(8)
+.RE
+.SH "HISTORY"
+.SS "Version 1\&.0"
+.PP
+2010\-09\-06
+.RS 4
+First release\&.
+.RE
+.SH "BUGS"
+.sp
+No time to include bugs, command actions might seldom lead astray user\(cqs assumption\&.
+.SH "AUTHORS"
+.sp
+mysql\-backup is written by S\('ebastien Gross <seb\(buɑƬ\(buchezwam\(buɖɵʈ\(buorg>\&.
+.SH "COPYRIGHT"
+.sp
+Copyright \(co 2010 S\('ebastien Gross <seb\(buɑƬ\(buchezwam\(buɖɵʈ\(buorg>\&.
+.sp
+Released under GNU GPL version 3 or higher (\m[blue]\fBhttp://www\&.gnu\&.org/licenses/gpl\&.html\fR\m[])\&.
