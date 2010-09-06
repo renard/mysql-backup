@@ -2,7 +2,7 @@
 
 # mysql-backup --- Backup mysql databases
 # Copyright © 2010 Sébastien Gross <seb•ɑƬ•chezwam•ɖɵʈ•org>
-# Last changed: 2010-09-06 15:42:05
+# Last changed: 2010-09-06 17:51:00
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -22,7 +22,7 @@ VERSION="1.0"
 # Default values just in case of...
 
 # Backup options
-BACKUP_DIR=/var/lib/mysql-backup
+BACKUP_DIR=/var/backups/mysql
 DATABASES="ALL"
 IGNORE_DATABASES=(information_schema)
 COMPRESSION=gzip
@@ -150,7 +150,7 @@ if test -r "${cli_config}"; then
 fi
 
 backup_dir="${BACKUP_DIR}/${host}"
-backup_log="${backup_dir}/log"
+backup_log="/var/log/mysql-backup/${host}.log"
 
 # Build mysql command line
 function build_mysql_cli() {
