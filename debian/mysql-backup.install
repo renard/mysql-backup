@@ -1,0 +1,2 @@
+mysql-backup usr/bin
+default.cnf etc/mysql-backup

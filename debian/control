@@ -1,0 +1,24 @@
+Source: mysql-backup
+Section: admin
+Priority: extra
+Maintainer: Sébastien Gross <seb•ɑƬ•chezwam•ɖɵʈ•org>
+Build-Depends: debhelper (>= 7.0.50)
+Standards-Version: 3.8.0
+Homepage: http://git-hub.com/renard/mysql-backup
+
+Package: mysql-backup
+Architecture: all
+Depends: ${shlibs:Depends}, ${misc:Depends}, mysql-client,
+	  debianutils (>= 2.30), adduser
+Suggests: gzip, bzip2, xz-utils
+Description: MySQL database backup tool
+ Performs daily, weekly and monthly backup of MySQL databases.
+ .
+ Features:
+ .
+  - Backup multiple databases
+  - Compress backup files
+  - Backup remote servers
+  - Rotate backups
+  - Perform restoration
+  - more...

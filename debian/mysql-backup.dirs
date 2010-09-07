@@ -1,0 +1,3 @@
+usr/bin
+etc/mysql-backup
+var/log/mysql-backup
