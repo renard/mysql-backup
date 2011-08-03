@@ -71,7 +71,7 @@ RET=
 # Load default values
 for f in /etc/mysql-backup/default.cnf ~/.mysql-backup.cnf .mysql-backup.cnf; do
     if test -r ${f}; then
-	break
+	source ${f}
     fi
 done
 
