@@ -32,6 +32,7 @@ WEEKLY_DAY="1"
 WEEKLY_RETENTION=35
 MONTHLY_DAY="01"
 MONTHLY_RETENTION=365
+HOST=
 pre_backup_hook=
 post_backup_hook=
 pre_restore_hook=
@@ -149,8 +150,8 @@ if test -r "${cli_config}"; then
     source "${cli_config}"
 fi
 
-backup_dir="${BACKUP_DIR}/${host}"
-backup_log="/var/log/mysql-backup/${host}.log"
+backup_dir="${BACKUP_DIR}/${HOST}"
+backup_log="/var/log/mysql-backup/${HOST}.log"
 
 # Build mysql command line
 function build_mysql_cli() {
@@ -378,9 +379,9 @@ function cmd_restore() {
 	else
 	    ### COPY PREVIOUS LINE WITHOUT ECHO
 	    run_hook pre_restore_hook_${base}
-	    log "Restoring ${base} from ${date} on ${host}."
+	    log "Restoring ${base} from ${date} on ${HOST}."
 	    echo "DO REAL RESTORE"
-	    log "Restoring ${base} from ${date} on ${host} done."
+	    log "Restoring ${base} from ${date} on ${HOST} done."
 	    run_hook post_restore_hook_${base}
 	fi
     done

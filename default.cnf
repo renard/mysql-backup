@@ -11,12 +11,17 @@ WEEKLY_DAY="1"
 WEEKLY_RETENTION=35
 MONTHLY_DAY="01"
 MONTHLY_RETENTION=365
+HOST=$(hostname)
+
 pre_backup_hook=
 post_backup_hook=
 pre_restore_hook=
 post_restore_hook=
 
 # mysql / mysqldump default configuration
+
+# uncomment next line if host is different than $HOST
+# host=127.0.0.1
 batch=1
 skip_column_names=1
 quote_names=1
