@@ -167,6 +167,14 @@ MONTHLY_DAY::
 
   Which day monthly backup are done (00..31).
 
+HOST::
+
+  Name of the host to backup for logging purposes.
+
+
+NOTE: This is not the mysql host to backup (use "host" in lowercase for
+that).
+
 ==== Hooks ====
 
 Hooks are scripts that can be run via *run-parts*(1).
