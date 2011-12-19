@@ -2,7 +2,7 @@
 
 # mysql-backup --- Backup mysql databases
 # Copyright © 2010 Sébastien Gross <seb•ɑƬ•chezwam•ɖɵʈ•org>
-# Last changed: 2011-12-19 17:09:04
+# Last changed: 2011-12-19 17:13:19
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -258,6 +258,8 @@ function get_backup_file () {
 function cmd_backup() {
     find_db
     local dry_run=
+    local bkp_dir="${backup_dir}/dump"
+
     while test $# -ne 0; do
 	case "$1" in
 	    --dry-run) dry_run=1 ;;
@@ -271,38 +273,38 @@ function cmd_backup() {
     test -z "${dry_run}" && run_hook pre_backup_hook
     for db in ${DATABASES}; do
 	for t in daily weekly monthly; do
-	    mkdir -p "${backup_dir}/${t}"
+	    mkdir -p "${bkp_dir}/${t}"
 	done
 	test -z "${dry_run}" && log "${db} start"
 	test -z "${dry_run}" && run_hook pre_backup_hook_${db}
 	get_backup_file ${db}
 	backup_file=${RET}
 	if test -n "${dry_run}"; then
-	    echo "${mysqldump_cli} --databases ${db} | ${compression_cli} > \"${backup_dir}/daily/${backup_file}\""
+	    echo "${mysqldump_cli} --databases ${db} | ${compression_cli} > \"${bkp_dir}/daily/${backup_file}\""
 	    continue
 	fi
-	${mysqldump_cli} --databases ${db} | ${compression_cli} > "${backup_dir}/daily/${backup_file}"
+	${mysqldump_cli} --databases ${db} | ${compression_cli} > "${bkp_dir}/daily/${backup_file}"
 
 	# Keep weekly archives
 	if test "$(date +%w)" == "${WEEKLY_DAY}"; then
 	    log "${db} weekly"
-	    ln -f "${backup_dir}/daily/${backup_file}" "${backup_dir}/weekly/${backup_file}"
+	    ln -f "${bkp_dir}/daily/${backup_file}" "${bkp_dir}/weekly/${backup_file}"
 	fi
 	# remove old weekly archives
-	find "${backup_dir}/weekly" -type f -mtime +${WEEKLY_RETENTION} -print0 | \
+	find "${bkp_dir}/weekly" -type f -mtime +${WEEKLY_RETENTION} -print0 | \
 	    xargs -0 --no-run-if-empty rm
 
 	# Keep monthly archives
 	if test "$(date +%d)" == "${MONTHLY_DAY}"; then
 	    log "${db} monthly"
-	    ln -f "${backup_dir}/daily/${backup_file}" "${backup_dir}/monthly/${backup_file}"
+	    ln -f "${bkp_dir}/daily/${backup_file}" "${bkp_dir}/monthly/${backup_file}"
 	fi
 	# remove old monthly archives
-	find "${backup_dir}/monthly" -type f -mtime +${MONTHLY_RETENTION} -print0 | \
+	find "${bkp_dir}/monthly" -type f -mtime +${MONTHLY_RETENTION} -print0 | \
 	    xargs -0 --no-run-if-empty rm
 
 	# remove old daily archives
-	find "${backup_dir}/daily" -type f -mtime +${DAILY_RETENTION} -print0 | \
+	find "${bkp_dir}/daily" -type f -mtime +${DAILY_RETENTION} -print0 | \
 	    xargs -0 --no-run-if-empty rm
 	run_hook pre_backup_hook_${db}
 	log "${db} done"
@@ -311,12 +313,13 @@ function cmd_backup() {
     test -z "${dry_run}" && log "DAILY backup done"
 }
 
-
 # This has to be done
 function cmd_restore() {
     local dry_run=
     local date=
     local bases=
+    local bkp_dir="${backup_dir}/dump"
+
     while test $# -ne 0; do
 	case "$1" in
 	    --dry-run) dry_run=1 ;;
@@ -335,13 +338,13 @@ function cmd_restore() {
     done
 
     if test -z "${date}"; then
-	date=$(find "${backup_dir}" -type f -name '*.sql*' | \
+	date=$(find "${bkp_dir}" -type f -name '*.sql*' | \
 	    ${sed} -n 's,^.*/[^/]\+_\([0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}\)[^/]*$,\1,p' | \
 	    ${sort} | ${tail} -n1)
     fi
 
     if test -z "${bases}"; then
-	bases=$(find "${backup_dir}" -type f -name '*.sql*' | \
+	bases=$(find "${bkp_dir}" -type f -name '*.sql*' | \
 	    ${sed} -n 's,^.*/\([^/]\+\)_[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}[^/]*$,\1,p' | \
 	    ${sort} | ${uniq} )
     fi
@@ -349,7 +352,7 @@ function cmd_restore() {
     for base in ${bases}; do
 	file_to_restore=
 	for t in daily weekly monthly; do
-	    file_to_restore="${backup_dir}/${t}/${base}_${date}.${backup_extension}"
+	    file_to_restore="${bkp_dir}/${t}/${base}_${date}.${backup_extension}"
 	    if test -r "${file_to_restore}"; then
 		break
 	    else
