@@ -2,7 +2,7 @@
 
 # mysql-backup --- Backup mysql databases
 # Copyright © 2010 Sébastien Gross <seb•ɑƬ•chezwam•ɖɵʈ•org>
-# Last changed: 2011-12-19 17:08:03
+# Last changed: 2011-12-19 17:09:04
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -312,15 +312,6 @@ function cmd_backup() {
 }
 
 
-# Retrieve last backup day.
-function find_last_backup_date() {
-    RET=$(find "${backup_dir}" -type f -name '*.sql*' | \
-	${sed} -n 's,^.*/[^/]\+_\([0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}\)[^/]*$,\1,p' | \
-	${sort} | ${tail} -n1)
-}
-
-
-
 # This has to be done
 function cmd_restore() {
     local dry_run=
@@ -344,8 +335,9 @@ function cmd_restore() {
     done
 
     if test -z "${date}"; then
-	find_last_backup_date
-	date=${RET}
+	date=$(find "${backup_dir}" -type f -name '*.sql*' | \
+	    ${sed} -n 's,^.*/[^/]\+_\([0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}\)[^/]*$,\1,p' | \
+	    ${sort} | ${tail} -n1)
     fi
 
     if test -z "${bases}"; then
