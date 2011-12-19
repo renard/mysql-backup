@@ -2,7 +2,7 @@
 
 # mysql-backup --- Backup mysql databases
 # Copyright © 2010 Sébastien Gross <seb•ɑƬ•chezwam•ɖɵʈ•org>
-# Last changed: 2011-12-19 20:55:07
+# Last changed: 2011-12-19 22:53:04
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -387,6 +387,8 @@ function cmd_snapshot () {
     fi
 
     local datadir_path=$(echo "${datadir}" | sed -e "s,^${mountpoint}/\?,,")
+    test -z "${dry_run}" && log "DAILY snapshot start"
+
 
     get_backup_file "$(hostname)-snapshot"
     local snapshot_file=${RET}
@@ -437,13 +439,15 @@ EOF
 	exit
     fi
 
-    set -x
     for t in daily weekly monthly; do
 	mkdir -p "${bkp_dir}/${t}"
     done
-    ${tar} -C ${TARGET_MOUNT}/${datadir_path} -cvf ${bkp_dir}/daily/${snapshot_file} .
+    ${tar} -C ${TARGET_MOUNT}/${datadir_path} -cvzf ${bkp_dir}/daily/${snapshot_file} .
 
     archive_bkps "${bkp_dir}" "${snapshot_file}" "Snapshot $(hostname)"
+    ${umount} ${TARGET_MOUNT} > /dev/null 2>&1
+    ${lvremove} ${LVREMOVE_OPTS} ${lvm_snapshot}
+    test -z "${dry_run}" && log "DAILY snapshot done"
 }
 
 # This has to be done
