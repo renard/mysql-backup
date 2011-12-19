@@ -2,7 +2,7 @@
 
 # mysql-backup --- Backup mysql databases
 # Copyright © 2010 Sébastien Gross <seb•ɑƬ•chezwam•ɖɵʈ•org>
-# Last changed: 2011-12-19 17:13:19
+# Last changed: 2011-12-19 20:55:07
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -33,6 +33,13 @@ WEEKLY_RETENTION=35
 MONTHLY_DAY="01"
 MONTHLY_RETENTION=365
 HOST=
+
+LVM_SNAPSHOT_SIZE="10G"
+LVM_EXT="_bkp"
+
+LVREMOVE_OPTS="-f"
+TARGET_MOUNT="/tmp/mysql-snapshot"
+
 pre_backup_hook=
 post_backup_hook=
 pre_restore_hook=
@@ -54,6 +61,12 @@ sort=$(which sort)
 uniq=$(which uniq)
 tail=$(which tail)
 run_parts=$(which run-parts)
+lvcreate=$(which lvcreate)
+lvremove=$(which lvremove)
+lvdisplay=$(which lvdisplay)
+mount=$(which mount)
+umount=$(which umount)
+tar=$(which tar)
 
 # Useful variables
 mysql_cli=
@@ -123,6 +136,8 @@ Commands:
     --date      DATE   Restore backup for a given date.
     --bases     BASES  Restore backup for a given set of bases.
 
+  snapshot           Do a LVM snapshot
+    --dry-run          Only print what would be done.
 EOF
     exit ${exit_code}
 }
@@ -131,7 +146,7 @@ EOF
 command=
 while test $# != 0 && test -z "$command"; do
     case "$1" in
-	backup|restore) command=cmd_$1;;
+	backup|restore|snapshot) command=cmd_$1;;
         -c|--config)
             test -z "$2" && die "Need a parameter for $1."
             cli_config=$2
@@ -311,6 +326,124 @@ function cmd_backup() {
     done
     test -z "${dry_run}" && run_hook post_backup_hook
     test -z "${dry_run}" && log "DAILY backup done"
+}
+
+
+# do archive backups
+# $1 => root directory for backups
+# $2 => backup file name
+# $3 => db name (for loggin purposes
+function archive_bkps () {
+    local bkp_dir="$1"
+    local backup_file="$2"
+    local db="$3"
+
+    # Keep weekly archives
+    if test "$(date +%w)" == "${WEEKLY_DAY}"; then
+	log "${db} weekly"
+	ln -f "${bkp_dir}/daily/${backup_file}" "${bkp_dir}/weekly/${backup_file}"
+    fi
+    # remove old weekly archives
+    find "${bkp_dir}/weekly" -type f -mtime +${WEEKLY_RETENTION} -print0 | \
+	xargs -0 --no-run-if-empty rm
+    # Keep monthly archives
+    if test "$(date +%d)" == "${MONTHLY_DAY}"; then
+	log "${db} monthly"
+	ln -f "${bkp_dir}/daily/${backup_file}" "${bkp_dir}/monthly/${backup_file}"
+    fi
+    # remove old monthly archives
+    find "${bkp_dir}/monthly" -type f -mtime +${MONTHLY_RETENTION} -print0 | \
+	xargs -0 --no-run-if-empty rm
+    # remove old daily archives
+    find "${bkp_dir}/daily" -type f -mtime +${DAILY_RETENTION} -print0 | \
+	xargs -0 --no-run-if-empty rm
+}
+
+
+
+function cmd_snapshot () {
+    local _datadir=$(${mysql_cli} -e "SHOW VARIABLES LIKE 'datadir'" \
+	| sed -e 's,\(^datadir[[:space:]]\+\|/$\),,g')
+    local datadir=$(readlink ${_datadir})
+    if test -z "${datadir}"; then
+	datadir="${_datadir}"
+    fi
+    local mountpoint=$(df ${datadir} | awk '{if(NF==6){print $NF}}')
+    local datadir_dev=$(df ${datadir} | awk '{if(NF==6){print $1}}' \
+	| xargs ${lvdisplay} -c  | cut -d: -f1)
+
+    if test -z "${datadir}"; then
+	die "LVM not installed or LVM commands not found or ${datadir} is not in LVM."
+    fi
+
+    local lvm_snapshot="${datadir_dev}${LVM_EXT}"
+    local fs_type=$(mount | sed -n "s,.* on ${mountpoint} type \([^[:space:]]\+\).*,\1,p")
+    local mount_opts="-o ro,noexec,nosuid,nodev"
+    if test "${fs_type}" == "xfs"; then
+	mount_opts="${mount_opts} -o nouuid"
+	# Do not freeze XFS since LVM change a
+	# mount: unknown filesystem type 'DM_snapshot_cow'
+	# error happens
+    fi
+
+    local datadir_path=$(echo "${datadir}" | sed -e "s,^${mountpoint}/\?,,")
+
+    get_backup_file "$(hostname)-snapshot"
+    local snapshot_file=${RET}
+    local bkp_dir="${backup_dir}/snapshot"
+
+
+
+    while test $# -ne 0; do
+	case "$1" in
+	    --dry-run) dry_run=1 ;;
+	    --) shift ; break ;;
+	    -*|*) help 0 ;;
+	esac
+	shift
+    done
+
+    if test -n "${dry_run}"; then
+	echo "${mysql_cli}"
+	cat<<EOF
+datadir      = ${datadir}
+mountpoint   = ${mountpoint}
+datadir_dev  = ${datadir_dev}
+datadir_path  = ${datadir_path}
+lvm_snapshot = ${lvm_snapshot}
+fs_type      = ${fs_type}
+mount_opts   = ${mount_opts}
+EOF
+
+    else
+
+	${umount} ${TARGET_MOUNT} > /dev/null 2>&1
+	${lvremove} ${LVREMOVE_OPTS} ${lvm_snapshot}
+	cat<<EOF | ${mysql} ${mysql_opts}
+SLAVE STOP;
+FLUSH TABLES WITH READ LOCK;
+system ${mysql_cli} -e "SHOW MASTER STATUS\G" > ${datadir}/show-master-status
+system ${mysql_cli} -e "SHOW SLAVE STATUS\G" > ${datadir}/show-slave-status
+system ${lvcreate} -s --size ${LVM_SNAPSHOT_SIZE} -n ${lvm_snapshot} ${datadir_dev} > /dev/null 2>&1
+UNLOCK TABLES;
+SLAVE START;
+EOF
+	mkdir -p ${TARGET_MOUNT}
+	${mount} ${mount_opts} ${lvm_snapshot} ${TARGET_MOUNT}
+    fi
+    # do the backup
+    if test -n "${dry_run}"; then
+	echo "${tar} -C ${TARGET_MOUNT}/${datadir_path} -xf ${bkp_dir}/daily/${snapshot_file} ."
+	exit
+    fi
+
+    set -x
+    for t in daily weekly monthly; do
+	mkdir -p "${bkp_dir}/${t}"
+    done
+    ${tar} -C ${TARGET_MOUNT}/${datadir_path} -cvf ${bkp_dir}/daily/${snapshot_file} .
+
+    archive_bkps "${bkp_dir}" "${snapshot_file}" "Snapshot $(hostname)"
 }
 
 # This has to be done
