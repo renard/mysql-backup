@@ -2,7 +2,7 @@
 
 # mysql-backup --- Backup mysql databases
 # Copyright © 2010 Sébastien Gross <seb•ɑƬ•chezwam•ɖɵʈ•org>
-# Last changed: 2012-01-03 19:33:52
+# Last changed: 2012-01-03 19:36:23
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -323,11 +323,8 @@ function cmd_backup() {
 	test -z "${dry_run}" && run_hook pre_dump_backup_hook_${db}
 	get_backup_file ${db}
 	backup_file=${RET}
-	if test -n "${dry_run}"; then
-	    echo "${mysqldump_cli} --databases ${db} | ${compression_cli} > \"${bkp_dir}/daily/${backup_file}\""
-	    continue
-	fi
-	${mysqldump_cli} --databases ${db} | ${compression_cli} > "${bkp_dir}/daily/${backup_file}"
+	cmd "${mysqldump_cli} --databases ${db} | \
+            ${compression_cli} > '${bkp_dir}/daily/${backup_file}'"
 
 	archive_bkps "${bkp_dir}" "${backup_file}" "Dump $(hostname)"
 
