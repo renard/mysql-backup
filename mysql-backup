@@ -2,7 +2,7 @@
 
 # mysql-backup --- Backup mysql databases
 # Copyright © 2010 Sébastien Gross <seb•ɑƬ•chezwam•ɖɵʈ•org>
-# Last changed: 2011-12-19 22:53:04
+# Last changed: 2012-01-03 15:03:52
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -300,27 +300,8 @@ function cmd_backup() {
 	fi
 	${mysqldump_cli} --databases ${db} | ${compression_cli} > "${bkp_dir}/daily/${backup_file}"
 
-	# Keep weekly archives
-	if test "$(date +%w)" == "${WEEKLY_DAY}"; then
-	    log "${db} weekly"
-	    ln -f "${bkp_dir}/daily/${backup_file}" "${bkp_dir}/weekly/${backup_file}"
-	fi
-	# remove old weekly archives
-	find "${bkp_dir}/weekly" -type f -mtime +${WEEKLY_RETENTION} -print0 | \
-	    xargs -0 --no-run-if-empty rm
+	archive_bkps "${bkp_dir}" "${backup_file}" "Dump $(hostname)"
 
-	# Keep monthly archives
-	if test "$(date +%d)" == "${MONTHLY_DAY}"; then
-	    log "${db} monthly"
-	    ln -f "${bkp_dir}/daily/${backup_file}" "${bkp_dir}/monthly/${backup_file}"
-	fi
-	# remove old monthly archives
-	find "${bkp_dir}/monthly" -type f -mtime +${MONTHLY_RETENTION} -print0 | \
-	    xargs -0 --no-run-if-empty rm
-
-	# remove old daily archives
-	find "${bkp_dir}/daily" -type f -mtime +${DAILY_RETENTION} -print0 | \
-	    xargs -0 --no-run-if-empty rm
 	run_hook pre_backup_hook_${db}
 	log "${db} done"
     done
