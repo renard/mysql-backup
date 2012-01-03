@@ -177,31 +177,12 @@ that).
 
 ==== Hooks ====
 
-Hooks are scripts that can be run via *run-parts*(1).
+Hooks are scripts that can be run via run-parts(8). Each hook parameter
+consists of a directory path suitable for run-parts(8).
 
-pre_dump_backup_hook::
+See run-parts(8) for further information on how hooks are run.
 
-  Hook to be run before the backup process really starts.
-
-post_dump_backup_hook::
-
-  Hook to be run after the backup process is done.
-
-pre_dump_restore_hook::
-
-  Hook to be run before the restore process really starts.
-
-post_dump_restore_hook::
-
-  Hook to be run after the restore process is done.
-
-NOTE: In addition hook names could be postfixed with a database name. This
-means a hook could be defined for a specific database.
-
-EXAMPLE: *post_dump_backup_hook_a_database* is ran before *a_database* would
-be backuped.
-
-See *run-parts*(8) for further information on how hooks are run.
+See *HOOK DETAILS* section for details.
 
 == ARCHIVE PROCEDURE ==
 
@@ -216,7 +197,62 @@ This system keeps space on the backup server by the use of hard links.
 
 NOTE: This only woks if all backups are in a single partition.
 
+== HOOKS DETAILS ==
 
+=== Dump hooks ===
+
+pre_dump_backup_hook::
+
+  Hook to be run before the dump backup process really starts.
+
+post_dump_backup_hook::
+
+  Hook to be run after the dump backup process is done.
+
+pre_dump_restore_hook::
+
+  Hook to be run before the dump restore process really starts.
+
+post_dump_restore_hook::
+
+  Hook to be run after the dump restore process is done.
+
+
+NOTE: In addition hook names could be postfixed with a database name. This
+means a hook could be defined for a specific database.
+
+EXAMPLE: *post_dump_backup_hook_a_database* is ran before *a_database* would
+be backuped.
+
+
+=== Snapshot hooks ===
+
+pre_snapshot_backup_hook::
+
+  Hook to be run before a snapshot really stats.
+
+post_snapshot_backup_hook::
+
+  Hook to be run when a snapshot is done.
+
+pre_snapshot_backup_lvm_snaphost_hook::
+
+  Hook to be run before the LVM snapshot is started.
+
+post_snapshot_backup_lvm_snaphost_hook::
+
+  Hook to be run after the LVM snapshot is done.
+
+pre_snapshot_backup_archive_hook::
+
+  Hook to be run before the archive process is started.
+
+post_snapshot_backup_archive_hook::
+
+  Hook to be run after the archive process is done.
+
+NOTE: There is no batabase postfix for snapshot hooks since there would be
+nonsense.
 
 == SEE ALSO ==
 

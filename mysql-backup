@@ -2,7 +2,7 @@
 
 # mysql-backup --- Backup mysql databases
 # Copyright © 2010 Sébastien Gross <seb•ɑƬ•chezwam•ɖɵʈ•org>
-# Last changed: 2012-01-03 15:35:17
+# Last changed: 2012-01-03 16:00:37
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -40,10 +40,19 @@ LVM_EXT="_bkp"
 LVREMOVE_OPTS="-f"
 TARGET_MOUNT="/tmp/mysql-snapshot"
 
+# Dump hooks
 pre_dump_backup_hook=
 post_dump_backup_hook=
 pre_dump_restore_hook=
 post_dump_restore_hook=
+
+# Snapshot hooks
+pre_snapshot_backup_hook=
+post_snapshot_backup_hook=
+pre_snapshot_backup_lvm_snaphost_hook=
+post_snapshot_backup_lvm_snaphost_hook=
+pre_snapshot_backup_archive_hook=
+post_snapshot_backup_archive_hook=
 
 
 # mysql / mysqldump default configuration
@@ -386,8 +395,9 @@ function cmd_snapshot () {
     test -z "${dry_run}" && log "DAILY snapshot start"
 
     if test -n "${dry_run}"; then
-	echo "${mysql_cli}"
 	cat<<EOF
+Variables:
+
 datadir      = ${datadir}
 mountpoint   = ${mountpoint}
 datadir_dev  = ${datadir_dev}
@@ -395,12 +405,39 @@ datadir_path  = ${datadir_path}
 lvm_snapshot = ${lvm_snapshot}
 fs_type      = ${fs_type}
 mount_opts   = ${mount_opts}
+
+Commands:
+
+${umount} ${TARGET_MOUNT} > /dev/null 2>&1
+${lvremove} ${LVREMOVE_OPTS} ${lvm_snapshot}
+${mysql} ${mysql_opts}
+
+Mysql query:
+
+--
+SLAVE STOP;
+FLUSH TABLES WITH READ LOCK;
+system ${mysql_cli} -e "SHOW MASTER STATUS\G" > ${datadir}/show-master-status
+system ${mysql_cli} -e "SHOW SLAVE STATUS\G" > ${datadir}/show-slave-status
+system ${lvcreate} -s --size ${LVM_SNAPSHOT_SIZE} -n ${lvm_snapshot} ${datadir_dev} > /dev/null 2>&1
+UNLOCK TABLES;
+SLAVE START;
+--
+
+mkdir -p ${TARGET_MOUNT}
+${mount} ${mount_opts} ${lvm_snapshot} ${TARGET_MOUNT}
+${tar} -C ${TARGET_MOUNT}/${datadir_path} -cvzf ${bkp_dir}/daily/${snapshot_file} .
+
+${umount} ${TARGET_MOUNT} > /dev/null 2>&1
+${lvremove} ${LVREMOVE_OPTS} ${lvm_snapshot}
 EOF
 
     else
-
+	run_hook pre_snapshot_backup_hook
 	${umount} ${TARGET_MOUNT} > /dev/null 2>&1
 	${lvremove} ${LVREMOVE_OPTS} ${lvm_snapshot}
+
+	run_hook pre_snapshot_backup_lvm_snaphost_hook
 	cat<<EOF | ${mysql} ${mysql_opts}
 SLAVE STOP;
 FLUSH TABLES WITH READ LOCK;
@@ -410,24 +447,25 @@ system ${lvcreate} -s --size ${LVM_SNAPSHOT_SIZE} -n ${lvm_snapshot} ${datadir_d
 UNLOCK TABLES;
 SLAVE START;
 EOF
+	run_hook post_snapshot_backup_lvm_snaphost_hook
+
 	mkdir -p ${TARGET_MOUNT}
 	${mount} ${mount_opts} ${lvm_snapshot} ${TARGET_MOUNT}
-    fi
-    # do the backup
-    if test -n "${dry_run}"; then
-	echo "${tar} -C ${TARGET_MOUNT}/${datadir_path} -xf ${bkp_dir}/daily/${snapshot_file} ."
-	exit
-    fi
 
-    for t in daily weekly monthly; do
-	mkdir -p "${bkp_dir}/${t}"
-    done
-    ${tar} -C ${TARGET_MOUNT}/${datadir_path} -cvzf ${bkp_dir}/daily/${snapshot_file} .
+	for t in daily weekly monthly; do
+	    mkdir -p "${bkp_dir}/${t}"
+	done
 
-    archive_bkps "${bkp_dir}" "${snapshot_file}" "Snapshot $(hostname)"
-    ${umount} ${TARGET_MOUNT} > /dev/null 2>&1
-    ${lvremove} ${LVREMOVE_OPTS} ${lvm_snapshot}
-    test -z "${dry_run}" && log "DAILY snapshot done"
+	run_hook pre_snapshot_backup_archive_hook
+	${tar} -C ${TARGET_MOUNT}/${datadir_path} -cvzf ${bkp_dir}/daily/${snapshot_file} .
+	archive_bkps "${bkp_dir}" "${snapshot_file}" "Snapshot $(hostname)"
+	run_hook post_snapshot_backup_archive_hook
+	${umount} ${TARGET_MOUNT} > /dev/null 2>&1
+	${lvremove} ${LVREMOVE_OPTS} ${lvm_snapshot}
+
+	run_hook post_snapshot_backup_hook
+	log "DAILY snapshot done"
+    fi
 }
 
 # This has to be done

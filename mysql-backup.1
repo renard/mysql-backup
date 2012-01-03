@@ -397,47 +397,11 @@ This is not the mysql host to backup (use "host" in lowercase for that)\&.
 \fBHooks\fR
 .RS 4
 .sp
-Hooks are scripts that can be run via \fBrun\-parts\fR(1)\&.
-.PP
-pre_dump_backup_hook
-.RS 4
-Hook to be run before the backup process really starts\&.
-.RE
-.PP
-post_dump_backup_hook
-.RS 4
-Hook to be run after the backup process is done\&.
-.RE
-.PP
-pre_dump_restore_hook
-.RS 4
-Hook to be run before the restore process really starts\&.
-.RE
-.PP
-post_dump_restore_hook
-.RS 4
-Hook to be run after the restore process is done\&.
-.RE
-.if n \{\
+Hooks are scripts that can be run via run\-parts(8)\&. Each hook parameter consists of a directory path suitable for run\-parts(8)\&.
 .sp
-.\}
-.RS 4
-.it 1 an-trap
-.nr an-no-space-flag 1
-.nr an-break-flag 1
-.br
-.ps +1
-\fBNote\fR
-.ps -1
-.br
+See run\-parts(8) for further information on how hooks are run\&.
 .sp
-In addition hook names could be postfixed with a database name\&. This means a hook could be defined for a specific database\&.
-.sp .5v
-.RE
-.sp
-EXAMPLE: \fBpost_dump_backup_hook_a_database\fR is ran before \fBa_database\fR would be backuped\&.
-.sp
-See \fBrun\-parts\fR(8) for further information on how hooks are run\&.
+See \fBHOOK DETAILS\fR section for details\&.
 .RE
 .SH "ARCHIVE PROCEDURE"
 .sp
@@ -460,6 +424,93 @@ This system keeps space on the backup server by the use of hard links\&.
 .br
 .sp
 This only woks if all backups are in a single partition\&.
+.sp .5v
+.RE
+.SH "HOOKS DETAILS"
+.SS "Dump hooks"
+.PP
+pre_dump_backup_hook
+.RS 4
+Hook to be run before the dump backup process really starts\&.
+.RE
+.PP
+post_dump_backup_hook
+.RS 4
+Hook to be run after the dump backup process is done\&.
+.RE
+.PP
+pre_dump_restore_hook
+.RS 4
+Hook to be run before the dump restore process really starts\&.
+.RE
+.PP
+post_dump_restore_hook
+.RS 4
+Hook to be run after the dump restore process is done\&.
+.RE
+.if n \{\
+.sp
+.\}
+.RS 4
+.it 1 an-trap
+.nr an-no-space-flag 1
+.nr an-break-flag 1
+.br
+.ps +1
+\fBNote\fR
+.ps -1
+.br
+.sp
+In addition hook names could be postfixed with a database name\&. This means a hook could be defined for a specific database\&.
+.sp .5v
+.RE
+.sp
+EXAMPLE: \fBpost_dump_backup_hook_a_database\fR is ran before \fBa_database\fR would be backuped\&.
+.SS "Snapshot hooks"
+.PP
+pre_snapshot_backup_hook
+.RS 4
+Hook to be run before a snapshot really stats\&.
+.RE
+.PP
+post_snapshot_backup_hook
+.RS 4
+Hook to be run when a snapshot is done\&.
+.RE
+.PP
+pre_snapshot_backup_lvm_snaphost_hook
+.RS 4
+Hook to be run before the LVM snapshot is started\&.
+.RE
+.PP
+post_snapshot_backup_lvm_snaphost_hook
+.RS 4
+Hook to be run after the LVM snapshot is done\&.
+.RE
+.PP
+pre_snapshot_backup_archive_hook
+.RS 4
+Hook to be run before the archive process is started\&.
+.RE
+.PP
+post_snapshot_backup_archive_hook
+.RS 4
+Hook to be run after the archive process is done\&.
+.RE
+.if n \{\
+.sp
+.\}
+.RS 4
+.it 1 an-trap
+.nr an-no-space-flag 1
+.nr an-break-flag 1
+.br
+.ps +1
+\fBNote\fR
+.ps -1
+.br
+.sp
+There is no batabase postfix for snapshot hooks since there would be nonsense\&.
 .sp .5v
 .RE
 .SH "SEE ALSO"
