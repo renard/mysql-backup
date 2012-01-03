@@ -13,10 +13,20 @@ MONTHLY_DAY="01"
 MONTHLY_RETENTION=365
 HOST=$(hostname)
 
+# Dump hooks
 pre_dump_backup_hook=
 post_dump_backup_hook=
 pre_dump_restore_hook=
 post_dump_restore_hook=
+
+# Snapshot hooks
+pre_snapshot_backup_hook=
+post_snapshot_backup_hook=
+pre_snapshot_backup_lvm_snaphost_hook=
+post_snapshot_backup_lvm_snaphost_hook=
+pre_snapshot_backup_archive_hook=
+post_snapshot_backup_archive_hook=
+
 
 # mysql / mysqldump default configuration
 
