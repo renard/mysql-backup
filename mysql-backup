@@ -2,7 +2,7 @@
 
 # mysql-backup --- Backup mysql databases
 # Copyright © 2010 Sébastien Gross <seb•ɑƬ•chezwam•ɖɵʈ•org>
-# Last changed: 2012-01-03 19:36:23
+# Last changed: 2012-01-03 19:46:08
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -109,20 +109,20 @@ function die() {
 function log() {
     d=$(dirname "${backup_log}")
     test -d "${d}" || mkdir "${d}"
-    echo "$(date +'%F %T') $*" >> "${backup_log}"
+    test -z "${dry_run}" &&  echo "$(date +'%F %T') $*" >> "${backup_log}"
     test -n "${cli_verbose}" && echo "$(date +'%F %T') $*"
 }
 
 function cmd() {
-    test -n "${cli_verbose}" && echo "$*"
+    test -n "${cli_verbose}" -o -n "${dry_run}" && echo "$*"
     test -z "${dry_run}" && eval "$*"
 }
 
 function run_hook() {
     hook=$1
-    log "Running hook ${hook}"
 
     if test -n "${!hook}" -a -d "${!hook}"; then
+	log "Running hook ${hook}"
 	${run_parts} "${!hook}"
     fi
 }
