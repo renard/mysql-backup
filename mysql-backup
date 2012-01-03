@@ -2,7 +2,7 @@
 
 # mysql-backup --- Backup mysql databases
 # Copyright © 2010 Sébastien Gross <seb•ɑƬ•chezwam•ɖɵʈ•org>
-# Last changed: 2012-01-03 19:46:08
+# Last changed: 2012-01-03 19:53:47
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -313,14 +313,14 @@ function cmd_backup() {
 	shift
     done
 
-    test -z "${dry_run}" && log "DAILY backup start"
-    test -z "${dry_run}" && run_hook pre_dump_backup_hook
+    log "DAILY backup start"
+    run_hook pre_dump_backup_hook
     for db in ${DATABASES}; do
 	for t in daily weekly monthly; do
 	    mkdir -p "${bkp_dir}/${t}"
 	done
-	test -z "${dry_run}" && log "${db} start"
-	test -z "${dry_run}" && run_hook pre_dump_backup_hook_${db}
+	log "${db} start"
+	run_hook pre_dump_backup_hook_${db}
 	get_backup_file ${db}
 	backup_file=${RET}
 	cmd "${mysqldump_cli} --databases ${db} | \
@@ -331,8 +331,8 @@ function cmd_backup() {
 	run_hook post_dump_backup_hook_${db}
 	log "${db} done"
     done
-    test -z "${dry_run}" && run_hook post_dump_backup_hook
-    test -z "${dry_run}" && log "DAILY backup done"
+    run_hook post_dump_backup_hook
+    log "DAILY backup done"
 }
 
 
