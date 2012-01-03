@@ -179,27 +179,27 @@ that).
 
 Hooks are scripts that can be run via *run-parts*(1).
 
-pre_backup_hook::
+pre_dump_backup_hook::
 
   Hook to be run before the backup process really starts.
 
-post_backup_hook::
+post_dump_backup_hook::
 
   Hook to be run after the backup process is done.
 
-pre_restore_hook::
+pre_dump_restore_hook::
 
   Hook to be run before the restore process really starts.
 
-post_restore_hook::
+post_dump_restore_hook::
 
   Hook to be run after the restore process is done.
 
 NOTE: In addition hook names could be postfixed with a database name. This
 means a hook could be defined for a specific database.
 
-EXAMPLE: *post_backup_hook_a_database* is ran before *a_database* would be
-backuped.
+EXAMPLE: *post_dump_backup_hook_a_database* is ran before *a_database* would
+be backuped.
 
 See *run-parts*(8) for further information on how hooks are run.
 

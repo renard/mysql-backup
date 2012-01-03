@@ -2,12 +2,12 @@
 .\"     Title: mysql-backup
 .\"    Author: [see the "AUTHORS" section]
 .\" Generator: DocBook XSL Stylesheets v1.75.2 <http://docbook.sf.net/>
-.\"      Date: 08/03/2011
+.\"      Date: 01/03/2012
 .\"    Manual: \ \&
 .\"    Source: \ \&
 .\"  Language: English
 .\"
-.TH "MYSQL\-BACKUP" "1" "08/03/2011" "\ \&" "\ \&"
+.TH "MYSQL\-BACKUP" "1" "01/03/2012" "\ \&" "\ \&"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -399,22 +399,22 @@ This is not the mysql host to backup (use "host" in lowercase for that)\&.
 .sp
 Hooks are scripts that can be run via \fBrun\-parts\fR(1)\&.
 .PP
-pre_backup_hook
+pre_dump_backup_hook
 .RS 4
 Hook to be run before the backup process really starts\&.
 .RE
 .PP
-post_backup_hook
+post_dump_backup_hook
 .RS 4
 Hook to be run after the backup process is done\&.
 .RE
 .PP
-pre_restore_hook
+pre_dump_restore_hook
 .RS 4
 Hook to be run before the restore process really starts\&.
 .RE
 .PP
-post_restore_hook
+post_dump_restore_hook
 .RS 4
 Hook to be run after the restore process is done\&.
 .RE
@@ -435,7 +435,7 @@ In addition hook names could be postfixed with a database name\&. This means a h
 .sp .5v
 .RE
 .sp
-EXAMPLE: \fBpost_backup_hook_a_database\fR is ran before \fBa_database\fR would be backuped\&.
+EXAMPLE: \fBpost_dump_backup_hook_a_database\fR is ran before \fBa_database\fR would be backuped\&.
 .sp
 See \fBrun\-parts\fR(8) for further information on how hooks are run\&.
 .RE

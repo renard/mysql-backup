@@ -2,7 +2,7 @@
 
 # mysql-backup --- Backup mysql databases
 # Copyright © 2010 Sébastien Gross <seb•ɑƬ•chezwam•ɖɵʈ•org>
-# Last changed: 2012-01-03 15:03:52
+# Last changed: 2012-01-03 15:20:08
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -40,10 +40,10 @@ LVM_EXT="_bkp"
 LVREMOVE_OPTS="-f"
 TARGET_MOUNT="/tmp/mysql-snapshot"
 
-pre_backup_hook=
-post_backup_hook=
-pre_restore_hook=
-post_restore_hook=
+pre_dump_backup_hook=
+post_dump_backup_hook=
+pre_dump_restore_hook=
+post_dump_restore_hook=
 
 
 # mysql / mysqldump default configuration
@@ -285,13 +285,13 @@ function cmd_backup() {
     done
 
     test -z "${dry_run}" && log "DAILY backup start"
-    test -z "${dry_run}" && run_hook pre_backup_hook
+    test -z "${dry_run}" && run_hook pre_dump_backup_hook
     for db in ${DATABASES}; do
 	for t in daily weekly monthly; do
 	    mkdir -p "${bkp_dir}/${t}"
 	done
 	test -z "${dry_run}" && log "${db} start"
-	test -z "${dry_run}" && run_hook pre_backup_hook_${db}
+	test -z "${dry_run}" && run_hook pre_dump_backup_hook_${db}
 	get_backup_file ${db}
 	backup_file=${RET}
 	if test -n "${dry_run}"; then
@@ -302,10 +302,10 @@ function cmd_backup() {
 
 	archive_bkps "${bkp_dir}" "${backup_file}" "Dump $(hostname)"
 
-	run_hook pre_backup_hook_${db}
+	run_hook post_dump_backup_hook_${db}
 	log "${db} done"
     done
-    test -z "${dry_run}" && run_hook post_backup_hook
+    test -z "${dry_run}" && run_hook post_dump_backup_hook
     test -z "${dry_run}" && log "DAILY backup done"
 }
 
@@ -466,7 +466,7 @@ function cmd_restore() {
 	    ${sed} -n 's,^.*/\([^/]\+\)_[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}[^/]*$,\1,p' | \
 	    ${sort} | ${uniq} )
     fi
-    test -z "${dry_run}" && run_hook pre_restore_hook
+    test -z "${dry_run}" && run_hook pre_dump_restore_hook
     for base in ${bases}; do
 	file_to_restore=
 	for t in daily weekly monthly; do
@@ -485,14 +485,14 @@ function cmd_restore() {
 	    echo "${extract_cli} \"${file_to_restore}\" | ${mysql_cli}"
 	else
 	    ### COPY PREVIOUS LINE WITHOUT ECHO
-	    run_hook pre_restore_hook_${base}
+	    run_hook pre_dump_restore_hook_${base}
 	    log "Restoring ${base} from ${date} on ${HOST}."
 	    echo "DO REAL RESTORE"
 	    log "Restoring ${base} from ${date} on ${HOST} done."
-	    run_hook post_restore_hook_${base}
+	    run_hook post_dump_restore_hook_${base}
 	fi
     done
-    test -z "${dry_run}" && run_hook post_restore_hook
+    test -z "${dry_run}" && run_hook post_dump_restore_hook
 }
 
 
