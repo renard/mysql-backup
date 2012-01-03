@@ -2,7 +2,7 @@
 
 # mysql-backup --- Backup mysql databases
 # Copyright © 2010 Sébastien Gross <seb•ɑƬ•chezwam•ɖɵʈ•org>
-# Last changed: 2012-01-03 16:00:37
+# Last changed: 2012-01-03 18:44:59
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -76,6 +76,7 @@ lvdisplay=$(which lvdisplay)
 mount=$(which mount)
 umount=$(which umount)
 tar=$(which tar)
+tar_opts=""
 
 # Useful variables
 mysql_cli=
@@ -155,7 +156,7 @@ EOF
 command=
 while test $# != 0 && test -z "$command"; do
     case "$1" in
-	backup|restore|snapshot) command=cmd_$1;;
+	backup|restore|snapshot) command=$1;;
         -c|--config)
             test -z "$2" && die "Need a parameter for $1."
             cli_config=$2
@@ -247,6 +248,18 @@ function find_db () {
 }
 
 function build_compression_cli () {
+    local extension_prefix=
+
+    case ${command} in
+	snapshot)
+	    # Snapshots are always tar based
+	    extension_prefix="tar"
+	    ;;
+	dump|backup)
+	    extension_prefix="sql"
+	    ;;
+    esac
+
     case ${COMPRESSION} in
 	gzip) 
 	    compression_cli="${COMPRESSION}"
@@ -269,7 +282,7 @@ function build_compression_cli () {
 	    backup_extension=""
 	    ;;
     esac
-    backup_extension="sql${backup_extension}"
+    backup_extension="${extension_prefix}${backup_extension}"
 }
 
 function get_backup_file () {
@@ -377,7 +390,7 @@ function cmd_snapshot () {
 
     local datadir_path=$(echo "${datadir}" | sed -e "s,^${mountpoint}/\?,,")
 
-    get_backup_file "$(hostname)-snapshot"
+    get_backup_file "$(hostname)"
     local snapshot_file=${RET}
     local bkp_dir="${backup_dir}/snapshot"
 
@@ -457,11 +470,12 @@ EOF
 	done
 
 	run_hook pre_snapshot_backup_archive_hook
-	${tar} -C ${TARGET_MOUNT}/${datadir_path} -cvzf ${bkp_dir}/daily/${snapshot_file} .
+	${tar} ${tar_opts} -C ${TARGET_MOUNT}/${datadir_path} -c -f - . | \
+	    ${compression_cli} ${compression_opts} > ${bkp_dir}/daily/${snapshot_file}
 	archive_bkps "${bkp_dir}" "${snapshot_file}" "Snapshot $(hostname)"
 	run_hook post_snapshot_backup_archive_hook
 	${umount} ${TARGET_MOUNT} > /dev/null 2>&1
-	${lvremove} ${LVREMOVE_OPTS} ${lvm_snapshot}
+	${lvremove} ${LVREMOVE_OPTS} ${lvm_snapshot} > /dev/null 2>&1
 
 	run_hook post_snapshot_backup_hook
 	log "DAILY snapshot done"
@@ -540,6 +554,6 @@ build_mysqldump_cli
 build_compression_cli
 
 test -z "${command}" && die "No command specified"
-"${command}" "$@"
+"cmd_${command}" "$@"
 
 exit
