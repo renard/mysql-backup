@@ -2,7 +2,7 @@
 
 # mysql-backup --- Backup mysql databases
 # Copyright © 2010 Sébastien Gross <seb•ɑƬ•chezwam•ɖɵʈ•org>
-# Last changed: 2012-01-03 18:44:59
+# Last changed: 2012-01-03 19:09:58
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -89,6 +89,8 @@ backup_extension=
 cli_config=
 cli_verbose=
 
+quiet="> /dev/null 2>&1"
+
 
 RET=
 
@@ -109,6 +111,11 @@ function log() {
     test -d "${d}" || mkdir "${d}"
     echo "$(date +'%F %T') $*" >> "${backup_log}"
     test -n "${cli_verbose}" && echo "$(date +'%F %T') $*"
+}
+
+function cmd() {
+    test -n "${cli_verbose}" && echo "$*"
+    test -z "${dry_run}" && eval "$*"
 }
 
 function run_hook() {
@@ -450,8 +457,8 @@ EOF
 
 	${lvdisplay} -c | grep -F ${lvm_snapshot} > /dev/null 2>&1
 	if test $? -eq 0; then
-	    ${umount} ${TARGET_MOUNT} > /dev/null 2>&1
-	    ${lvremove} ${LVREMOVE_OPTS} ${lvm_snapshot}
+	    cmd ${umount} ${TARGET_MOUNT} ${quiet}
+	    cmd ${lvremove} ${LVREMOVE_OPTS} ${lvm_snapshot} ${quiet}
 	fi
 
 	run_hook pre_snapshot_backup_lvm_snaphost_hook
@@ -466,20 +473,20 @@ SLAVE START;
 EOF
 	run_hook post_snapshot_backup_lvm_snaphost_hook
 
-	mkdir -p ${TARGET_MOUNT}
-	${mount} ${mount_opts} ${lvm_snapshot} ${TARGET_MOUNT}
+	cmd mkdir -p ${TARGET_MOUNT}
+	cmd ${mount} ${mount_opts} ${lvm_snapshot} ${TARGET_MOUNT}
 
 	for t in daily weekly monthly; do
-	    mkdir -p "${bkp_dir}/${t}"
+	    cmd mkdir -p "${bkp_dir}/${t}"
 	done
 
 	run_hook pre_snapshot_backup_archive_hook
-	${tar} ${tar_opts} -C ${TARGET_MOUNT}/${datadir_path} -c -f - . | \
-	    ${compression_cli} ${compression_opts} > ${bkp_dir}/daily/${snapshot_file}
+	cmd "${tar} ${tar_opts} -C ${TARGET_MOUNT}/${datadir_path} -c -f - . | \
+	    ${compression_cli} ${compression_opts} > ${bkp_dir}/daily/${snapshot_file}"
 	archive_bkps "${bkp_dir}" "${snapshot_file}" "Snapshot $(hostname)"
 	run_hook post_snapshot_backup_archive_hook
-	${umount} ${TARGET_MOUNT} > /dev/null 2>&1
-	${lvremove} ${LVREMOVE_OPTS} ${lvm_snapshot} > /dev/null 2>&1
+	cmd ${umount} ${TARGET_MOUNT} ${quiet}
+	cmd ${lvremove} ${LVREMOVE_OPTS} ${lvm_snapshot} ${quiet}
 
 	run_hook post_snapshot_backup_hook
 	log "DAILY snapshot done"
