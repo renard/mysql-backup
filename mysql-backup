@@ -376,6 +376,7 @@ function archive_bkps () {
 function cmd_snapshot () {
     local _datadir=$(${mysql_cli} -e "SHOW VARIABLES LIKE 'datadir'" \
 	| sed -e 's,\(^datadir[[:space:]]\+\|/$\),,g')
+    test -z "${_datadir}" && die "Cannot connect to mysql server"
     local datadir=$(readlink ${_datadir})
     if test -z "${datadir}"; then
 	datadir="${_datadir}"
