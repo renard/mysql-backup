@@ -2,7 +2,7 @@
 
 # mysql-backup --- Backup mysql databases
 # Copyright © 2010 Sébastien Gross <seb•ɑƬ•chezwam•ɖɵʈ•org>
-# Last changed: 2012-01-04 14:01:30
+# Last changed: 2012-01-09 12:07:15
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -145,7 +145,7 @@ Options:
 
 Commands:
 
-  backup             Do the backups
+  dump               Do a dump backups
     --dry-run          Only print what would be done.
 
   restore            Restore a backup
@@ -163,7 +163,7 @@ EOF
 command=
 while test $# != 0 && test -z "$command"; do
     case "$1" in
-	backup|restore|snapshot) command=$1;;
+	dump|backup|restore|snapshot) command=$1;;
         -c|--config)
             test -z "$2" && die "Need a parameter for $1."
             cli_config=$2
@@ -299,7 +299,7 @@ function get_backup_file () {
 }
 
 
-function cmd_backup() {
+function cmd_dump() {
     find_db
     local dry_run=
     local bkp_dir="${backup_dir}/dump"
@@ -333,6 +333,11 @@ function cmd_backup() {
     done
     run_hook post_dump_backup_hook
     log "DAILY backup done"
+}
+
+function cmd_backup () {
+    log "backup function is deprecated and would be soon removed. Please use dump command instead."
+    cmd_dump "$@"
 }
 
 
