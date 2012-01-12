@@ -2,7 +2,7 @@
 
 # mysql-backup --- Backup mysql databases
 # Copyright © 2010 Sébastien Gross <seb•ɑƬ•chezwam•ɖɵʈ•org>
-# Last changed: 2012-01-10 09:45:42
+# Last changed: 2012-01-12 13:03:03
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -442,8 +442,8 @@ EOF
     mysql_query=$(cat <<EOF
 SLAVE STOP;
 FLUSH TABLES WITH READ LOCK;
-system ${mysql_cli} -e "SHOW MASTER STATUS\G" > ${datadir}/show-master-status
-system ${mysql_cli} -e "SHOW SLAVE STATUS\G" > ${datadir}/show-slave-status
+system ${mysql_cli} --column-names -e "SHOW MASTER STATUS\G" > ${datadir}/show-master-status
+system ${mysql_cli} --column-names -e "SHOW SLAVE STATUS\G" > ${datadir}/show-slave-status
 system ${lvcreate} -s --size ${LVM_SNAPSHOT_SIZE} -n ${lvm_snapshot} ${datadir_dev} > /dev/null 2>&1
 UNLOCK TABLES;
 SLAVE START;
