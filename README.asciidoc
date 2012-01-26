@@ -77,6 +77,19 @@ Each command has its own set of options.
   Restore backups for given set of databases. If this option is not set all
   found databases would be restored.
 
+==== snapshot options ====
+
+--dry-run::
+
+  Run backup in a dry-run mode: nothing would be done for real. Commands to
+  run are displayed on the screen.
+
+--no-archive::
+
+  Simply do the snapshot and mount the LVM volume. The user is responsible
+  of the snapshot umount an deletion.
+
+
 == CONFIGURATION FILE ==
 
 === Default configuration ===
@@ -263,6 +276,10 @@ nonsense.
 
 == HISTORY ==
 
+=== Version 1.9 ===
+
+- Add snapshot option
+
 === Version 1.0 ===
 
 2010-09-06::
@@ -280,7 +297,7 @@ user's assumption.
 
 == COPYRIGHT ==
 
-Copyright © 2010 Sébastien Gross <seb•ɑƬ•chezwam•ɖɵʈ•org>.
+Copyright © 2010-2012 Sébastien Gross <seb•ɑƬ•chezwam•ɖɵʈ•org>.
 
 Released under GNU GPL version 3 or higher
 (http://www.gnu.org/licenses/gpl.html[]).

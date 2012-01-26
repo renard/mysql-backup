@@ -2,7 +2,7 @@
 
 # mysql-backup --- Backup mysql databases
 # Copyright © 2010 Sébastien Gross <seb•ɑƬ•chezwam•ɖɵʈ•org>
-# Last changed: 2012-01-12 13:03:03
+# Last changed: 2012-01-26 17:13:05
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -155,6 +155,7 @@ Commands:
 
   snapshot           Do a LVM snapshot
     --dry-run          Only print what would be done.
+    --no-archive       Just snapshot, do not archive.
 EOF
     exit ${exit_code}
 }
@@ -405,10 +406,12 @@ function cmd_snapshot () {
     local bkp_dir="${backup_dir}/snapshot"
     local mysql_query=
 
+    local no_archive=
 
     while test $# -ne 0; do
 	case "$1" in
 	    --dry-run) dry_run=1 ;;
+	    --no-archive) no_archive=1;;
 	    --) shift ; break ;;
 	    -*|*) help 0 ;;
 	esac
@@ -460,13 +463,28 @@ EOF
 	cmd mkdir -p "${bkp_dir}/${t}"
     done
 
-    run_hook pre_snapshot_backup_archive_hook
-    cmd "${tar} ${tar_opts} -C ${TARGET_MOUNT}/${datadir_path} -c -f - . | \
-        ${compression_cli} ${compression_opts} > ${bkp_dir}/daily/${snapshot_file}"
-    archive_bkps "${bkp_dir}" "${snapshot_file}" "Snapshot $(hostname)"
-    run_hook post_snapshot_backup_archive_hook
-    cmd ${umount} ${TARGET_MOUNT} ${quiet}
-    cmd ${lvremove} ${LVREMOVE_OPTS} ${lvm_snapshot} ${quiet}
+    if test -z "${no_archive}"; then
+	run_hook pre_snapshot_backup_archive_hook
+	cmd "${tar} ${tar_opts} -C ${TARGET_MOUNT}/${datadir_path} -c -f - . | \
+            ${compression_cli} ${compression_opts} > ${bkp_dir}/daily/${snapshot_file}"
+	archive_bkps "${bkp_dir}" "${snapshot_file}" "Snapshot $(hostname)"
+	run_hook post_snapshot_backup_archive_hook
+	cmd ${umount} ${TARGET_MOUNT} ${quiet}
+	cmd ${lvremove} ${LVREMOVE_OPTS} ${lvm_snapshot} ${quiet}
+    else
+	if test -z "${dry_run}"; then
+	    cat <<EOF
+A snapshot image is available in ${TARGET_MOUNT}
+
+When done, you can remove it using:
+
+${umount} ${TARGET_MOUNT}
+${lvremove} ${LVREMOVE_OPTS} ${lvm_snapshot}
+
+EOF
+	fi
+	
+    fi
 
     run_hook post_snapshot_backup_hook
     log "DAILY snapshot done"
