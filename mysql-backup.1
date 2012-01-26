@@ -122,16 +122,37 @@ Show a short help screen\&.
 .RE
 .SS "Commands"
 .sp
-There are only two commands:
+There are only three commands:
 .PP
-backup
+dump
 .RS 4
-Perform the backup\&.
+Perform a mysqldump backup\&.
 .RE
 .PP
 restore
 .RS 4
-Performs the restoration of a previously done backup\&.
+Performs the restoration of a previously done mysqldump backup\&.
+.RE
+.if n \{\
+.sp
+.\}
+.RS 4
+.it 1 an-trap
+.nr an-no-space-flag 1
+.nr an-break-flag 1
+.br
+.ps +1
+\fBNote\fR
+.ps -1
+.br
+.sp
+To restore a LVM snapshot you just need to untar the archive\&.
+.sp .5v
+.RE
+.PP
+snapshot
+.RS 4
+Perform a LVM snapshot backup\&.
 .RE
 .SS "Command options"
 .sp
@@ -142,7 +163,7 @@ Each command has its own set of options\&.
 .nr an-break-flag 1
 .br
 .ps +1
-\fBbackup options\fR
+\fBdump options\fR
 .RS 4
 .PP
 \-\-dry\-run

@@ -39,21 +39,27 @@ Features:
 
 === Commands ===
 
-There are only two commands:
+There are only three commands:
 
-backup::
+dump::
 
-  Perform the backup.
+  Perform a mysqldump backup.
 
 restore::
 
-  Performs the restoration of a previously done backup.
+  Performs the restoration of a previously done mysqldump backup.
+
+NOTE: To restore a LVM snapshot you just need to untar the archive.
+
+snapshot::
+
+  Perform a LVM snapshot backup.
 
 === Command options ===
 
 Each command has its own set of options.
 
-==== backup options ====
+==== dump options ====
 
 --dry-run::
 
