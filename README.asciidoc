@@ -194,6 +194,27 @@ HOST::
 NOTE: This is not the mysql host to backup (use "host" in lowercase for
 that).
 
+==== LVM Options ====
+
+LVM_EXT::
+
+  Extention for the LVM snapshot (Default: "_bkp") that would be added to
+  the current LVM volumen name.
+
+LVCREATE_OPTS::
+
+  Options to pass to lvcreate(1) when doing LVM snapshot (Default:
+  "--chunksize=256").
+
+LVREMOVE_OPTS::
+
+  Options to pass to lvremove(1) when purging a snapshot (Default: "-f").
+
+TARGET_MOUNT::
+
+  Where to mount the LVM snapshot before archiving the data (Default:
+  "/tmp/mysql-snapshot").
+
 ==== Hooks ====
 
 Hooks are scripts that can be run via run-parts(8). Each hook parameter
@@ -285,6 +306,7 @@ nonsense.
 === Version 1.9 ===
 
 - Add snapshot option
+- Add *LVCREATE_OPTS*
 
 === Version 1.0 ===
 
