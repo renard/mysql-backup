@@ -2,7 +2,7 @@
 
 # mysql-backup --- Backup mysql databases
 # Copyright © 2010 Sébastien Gross <seb•ɑƬ•chezwam•ɖɵʈ•org>
-# Last changed: 2012-02-10 17:48:15
+# Last changed: 2012-05-04 18:45:05
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -296,8 +296,13 @@ function build_compression_cli () {
 
 function get_backup_file () {
     db=${1}
+    ignore_extention=${2}
     timestamp=$(date +%F)
-    RET="${db}_${timestamp}.${backup_extension}"
+    if test -z "${ignore_extention}"; then
+	RET="${db}_${timestamp}"
+    else
+	RET="${db}_${timestamp}.${backup_extension}"
+    fi
 }
 
 
@@ -317,6 +322,22 @@ function cmd_dump() {
 
     log "DAILY backup start"
     run_hook pre_dump_backup_hook
+
+    # Backup status too
+    get_backup_file "show-master-status" 1
+    local master_satus=${RET}
+    get_backup_file "show-slave-status" 1
+    local slave_satus=${RET}
+    local mysql_query=$(cat <<EOF
+SLAVE STOP;
+FLUSH TABLES WITH READ LOCK;
+system ${mysql_cli} --column-names -e "SHOW MASTER STATUS\G" > ${bkp_dir}/daily/${master_status}
+system ${mysql_cli} --column-names -e "SHOW SLAVE STATUS\G" >  ${bkp_dir}/daily/${slave_status}
+EOF
+    )
+    cmd "echo '${mysql_query}' | ${mysql} ${mysql_opts}"
+
+
     for db in ${DATABASES}; do
 	for t in daily weekly monthly; do
 	    mkdir -p "${bkp_dir}/${t}"
@@ -333,6 +354,14 @@ function cmd_dump() {
 	run_hook post_dump_backup_hook_${db}
 	log "${db} done"
     done
+
+    mysql_query=$(cat <<EOF
+RELEASE LOCK;
+SLAVE START;
+EOF
+    )
+    cmd "echo '${mysql_query}' | ${mysql} ${mysql_opts}"
+
     run_hook post_dump_backup_hook
     log "DAILY backup done"
 }
