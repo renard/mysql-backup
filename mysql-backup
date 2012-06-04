@@ -2,7 +2,7 @@
 
 # mysql-backup --- Backup mysql databases
 # Copyright © 2010 Sébastien Gross <seb•ɑƬ•chezwam•ɖɵʈ•org>
-# Last changed: Mon Jun  4 13:23:19 2012 (cest)
+# Last changed: Mon Jun  4 19:10:39 2012 (cest)
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -66,6 +66,7 @@ add_drop_database=1
 # Commands
 mysql=$(which mysql)
 mysqldump=$(which mysqldump)
+mysqladmin=$(which mysqladmin)
 sed=$(which sed)
 sort=$(which sort)
 uniq=$(which uniq)
@@ -513,6 +514,84 @@ EOF
 	cmd "${tar} ${tar_opts} -C ${TARGET_MOUNT}/${datadir_path} -c -f - . | \
             ${compression_cli} ${compression_opts} > ${bkp_dir}/daily/${snapshot_file}"
 	archive_bkps "${bkp_dir}" "${snapshot_file}" "Snapshot $(hostname)"
+
+	## Do text backup from LVM snapshot
+	## NEW:
+	local mysql_cli_bkp="${mysql_cli}"
+	mysql_cli="${mysql_cli} --socket=/tmp/mysqld.sock"
+	local mysqldump_cli_bkp="${mysqldump_cli}"
+	mysqldump_cli="${mysqldump_cli} --socket=/tmp/mysqld.sock"
+	local bkp_dir_bkp="${bk_dir}"
+	bkp_dir="${backup_dir}/dump"
+
+
+
+	for t in daily weekly monthly; do
+	    cmd mkdir -p "${bkp_dir}/${t}"
+	done
+
+
+	get_backup_file "${bkp_dir}/daily/ls_1" 1
+	cmd "find  ${TARGET_MOUNT}/${datadir_path} -type f -print0 | xargs -0 ls -l > ${RET}"
+	get_backup_file "${bkp_dir}/daily/md5sum_1" 1
+	cmd "find  ${TARGET_MOUNT}/${datadir_path} -type f -print0 | xargs -0 md5sum > ${RET}"
+
+
+
+
+	cmd ${mount} -o remount,rw ${TARGET_MOUNT}
+
+	get_backup_file "${bkp_dir}/daily/mysqld.err" 1
+	local mysql_log=${RET}
+	touch ${mysql_log}
+	chown mysql.mysql ${mysql_log}
+
+	cmd "mysqld --read-only --skip-networking --datadir=${TARGET_MOUNT}/${datadir_path} \
+	    --skip-slave-start  --socket=/tmp/mysqld.sock \
+	    --pid=/tmp/mysqld.pid --log-error=${mysql_log} >/dev/null 2>&1 &"
+
+	# test if new mysql instance can be reached.
+	for i in `seq 60`; do
+	    sleep 1
+	    cmd "${mysqladmin} --socket=/tmp/mysqld.sock ping > /dev/null 2>&1"
+	    ec=$?
+	    if test $ec -eq 0; then
+		break
+	    else
+		echo " $i $ec"
+	    fi
+
+	done
+
+	find_db
+
+	for db in ${DATABASES}; do
+	    log "${db} start"
+	    run_hook pre_dump_backup_hook_${db}
+	    get_backup_file ${db}
+	    backup_file=${RET}
+	    cmd "${mysqldump_cli} --databases ${db} | \
+            ${compression_cli} > '${bkp_dir}/daily/${backup_file}'"
+
+	    archive_bkps "${bkp_dir}" "${backup_file}" "Dump $(hostname)"
+
+	    run_hook post_dump_backup_hook_${db}
+	    log "${db} done"
+	done
+
+	archive_bkps "${bkp_dir}" "${mysql_log}" "Dump $(hostname)"
+
+	get_backup_file "${bkp_dir}/daily/ls_2" 1
+	cmd "find  ${TARGET_MOUNT}/${datadir_path} -type f -print0 | xargs -0 ls -l > ${RET}"
+	get_backup_file "${bkp_dir}/daily/md5sum_2" 1
+	cmd "find  ${TARGET_MOUNT}/${datadir_path} -type f -print0 | xargs -0 md5sum > ${RET}"
+
+	cmd ${mysqladmin} --socket=/tmp/mysqld.sock shutdown
+	mysql_cli="${mysql_cli_bkp}"
+	mysqldump_cli="${mysqldump_cli_bkp}"
+	bkp_dir="${bkp_dir}"
+
+
 	run_hook post_snapshot_backup_archive_hook
 	cmd ${umount} ${TARGET_MOUNT} ${quiet}
 	cmd ${lvremove} ${LVREMOVE_OPTS} ${lvm_snapshot} ${quiet}
