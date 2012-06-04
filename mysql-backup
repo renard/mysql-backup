@@ -2,7 +2,7 @@
 
 # mysql-backup --- Backup mysql databases
 # Copyright © 2010 Sébastien Gross <seb•ɑƬ•chezwam•ɖɵʈ•org>
-# Last changed: Mon Jun  4 13:09:47 2012 (cest)
+# Last changed: Mon Jun  4 13:16:31 2012 (cest)
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -298,7 +298,7 @@ function get_backup_file () {
     db=${1}
     ignore_extention=${2}
     timestamp=$(date +%F)
-    if test -z "${ignore_extention}"; then
+    if test -n "${ignore_extention}"; then
 	RET="${db}_${timestamp}"
     else
 	RET="${db}_${timestamp}.${backup_extension}"
@@ -320,14 +320,16 @@ function cmd_dump() {
 	shift
     done
 
+    set -x
+
     log "DAILY backup start"
     run_hook pre_dump_backup_hook
 
     # Backup status too
     get_backup_file "show-master-status" 1
-    local master_satus=${RET}
+    local master_status=${RET}
     get_backup_file "show-slave-status" 1
-    local slave_satus=${RET}
+    local slave_status=${RET}
     local mysql_query=$(cat <<EOF
 SLAVE STOP;
 FLUSH TABLES WITH READ LOCK;
