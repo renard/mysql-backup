@@ -2,7 +2,7 @@
 
 # mysql-backup --- Backup mysql databases
 # Copyright © 2010 Sébastien Gross <seb•ɑƬ•chezwam•ɖɵʈ•org>
-# Last changed: 2012-05-04 18:45:05
+# Last changed: Mon Jun  4 13:09:47 2012 (cest)
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -335,6 +335,19 @@ system ${mysql_cli} --column-names -e "SHOW MASTER STATUS\G" > ${bkp_dir}/daily/
 system ${mysql_cli} --column-names -e "SHOW SLAVE STATUS\G" >  ${bkp_dir}/daily/${slave_status}
 EOF
     )
+
+    # backup binlogs
+    cmd "echo '${mysql_query}' | ${mysql} ${mysql_opts}"
+    get_backup_file _binlogs
+    backup_file=${RET}
+    tar cfz ${bkp_dir}/daily/${backup_file} /var/lib/mysql/mysqld*.*
+    archive_bkps "${bkp_dir}" "${backup_file}" "Dump $(hostname)"
+
+    mysql_query=$(cat <<EOF
+UNLOCK TABLES;
+SLAVE START IO_THREAD;
+EOF
+    )
     cmd "echo '${mysql_query}' | ${mysql} ${mysql_opts}"
 
 
@@ -356,7 +369,6 @@ EOF
     done
 
     mysql_query=$(cat <<EOF
-RELEASE LOCK;
 SLAVE START;
 EOF
     )
