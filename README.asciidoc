@@ -305,6 +305,10 @@ nonsense.
 
 === Version 1.9 ===
 
+2012-06-04::
+
+  - Add replication information for dumps
+
 - Add snapshot option
 - Add *LVCREATE_OPTS*
 
