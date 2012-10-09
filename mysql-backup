@@ -320,8 +320,6 @@ function cmd_dump() {
 	shift
     done
 
-    set -x
-
     log "DAILY backup start"
     run_hook pre_dump_backup_hook
 
