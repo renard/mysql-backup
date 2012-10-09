@@ -341,7 +341,8 @@ EOF
     get_backup_file _binlogs
     backup_file=${RET}
     # This is not very potable and has to be fixed.
-    tar cfz ${bkp_dir}/daily/${backup_file} /var/lib/mysql/mysqld*.*
+    cd /var/lib/mysql
+    cmd "tar -czf ${bkp_dir}/daily/${backup_file} mysqld*.* master.info show-*status relay-log.info"
     archive_bkps "${bkp_dir}" "${backup_file}" "Dump $(hostname)"
 
     mysql_query=$(cat <<EOF
