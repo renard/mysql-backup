@@ -337,7 +337,7 @@ EOF
     )
 
     # backup binlogs
-    cmd "echo '${mysql_query}' | ${mysql} ${mysql_opts}"
+    cmd "echo '${mysql_query}' | ${mysql_cli}"
     get_backup_file _binlogs
     backup_file=${RET}
     # This is not very potable and has to be fixed.
@@ -350,7 +350,7 @@ UNLOCK TABLES;
 SLAVE START IO_THREAD;
 EOF
     )
-    cmd "echo '${mysql_query}' | ${mysql} ${mysql_opts}"
+    cmd "echo '${mysql_query}' | ${mysql_cli}"
 
 
     for db in ${DATABASES}; do
@@ -374,7 +374,7 @@ EOF
 SLAVE START;
 EOF
     )
-    cmd "echo '${mysql_query}' | ${mysql} ${mysql_opts}"
+    cmd "echo '${mysql_query}' | ${mysql_cli}"
 
     run_hook post_dump_backup_hook
     log "DAILY backup done"
@@ -497,7 +497,7 @@ SLAVE START;
 EOF
     )
 
-    cmd "echo '${mysql_query}' | ${mysql} ${mysql_opts}"
+    cmd "echo '${mysql_query}' | ${mysql_cli}"
     run_hook post_snapshot_backup_lvm_snaphost_hook
 
     cmd mkdir -p ${TARGET_MOUNT}
