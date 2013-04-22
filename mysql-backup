@@ -420,8 +420,8 @@ function cmd_snapshot () {
     if test -z "${datadir}"; then
 	datadir="${_datadir}"
     fi
-    local mountpoint=$(df ${datadir} | awk '{if(NF==6){print $NF}}')
-    local datadir_dev=$(df ${datadir} | awk '{if(NF==6){print $1}}' \
+    local mountpoint=$(df -P ${datadir} | awk '{if(NF==6){print $NF}}')
+    local datadir_dev=$(df -P ${datadir} | awk '{if(NF==6){print $1}}' \
 	| xargs ${lvdisplay} -c  | cut -d: -f1)
 
     if test -z "${datadir}"; then
