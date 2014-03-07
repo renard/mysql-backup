@@ -2,7 +2,7 @@
 
 # mysql-backup --- Backup mysql databases
 # Copyright © 2010 Sébastien Gross <seb•ɑƬ•chezwam•ɖɵʈ•org>
-# Last changed: Mon Jun  4 19:10:39 2012 (cest)
+# Last changed: 2014-03-07 11:35:32
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,14 +17,14 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-VERSION="1.9"
+VERSION="2.0"
 
 # Default values just in case of...
 
 # Backup options
 BACKUP_DIR=/var/backups/mysql
 DATABASES="ALL"
-IGNORE_DATABASES=(information_schema)
+IGNORE_DATABASES=("information_schema" "performance_schema")
 COMPRESSION=gzip
 COMPRESSION_OPTS=
 DAILY_RETENTION=7
@@ -62,11 +62,15 @@ skip_column_names=1
 quote_names=1
 opt=1
 add_drop_database=1
+single_transaction=1
 
 # Commands
 mysql=$(which mysql)
+mysqld=$(which mysqld)
 mysqldump=$(which mysqldump)
 mysqladmin=$(which mysqladmin)
+my_print_defaults=$(which my_print_defaults)
+awk=$(which awk)
 sed=$(which sed)
 sort=$(which sort)
 uniq=$(which uniq)
@@ -86,10 +90,21 @@ mysqldump_cli=
 compression_cli=
 extract_cli=
 backup_extension=
+lvm_snapshot=
+datadir_path=
+mysql_instance=mysqld
+mysqladmin_extra_file=
+
+backup_timestamp=$(date +%F)
+this_week_day=$(date +%w)
+this_month_day=$(date +%d)
 
 # Command line options
 cli_config=
 cli_verbose=
+dry_run=
+cli_dump=
+cli_snapshot=
 
 quiet="> /dev/null 2>&1"
 
@@ -162,36 +177,10 @@ EOF
     exit ${exit_code}
 }
 
-# Parse the command line
-command=
-while test $# != 0 && test -z "$command"; do
-    case "$1" in
-	dump|backup|restore|snapshot) command=$1;;
-        -c|--config)
-            test -z "$2" && die "Need a parameter for $1."
-            cli_config=$2
-            shift
-            ;;
-        -v|--verbose) cli_verbose=1 ;;
-        --help|-h) usage 0 ;;
-	--) shift; break ;;
-        -*|*) usage ;;
-    esac
-    shift
-done
-
-# Finally load configuration file.
-if test -r "${cli_config}"; then
-    source "${cli_config}"
-fi
-
-backup_dir="${BACKUP_DIR}/${HOST}"
-backup_log="/var/log/mysql-backup/${HOST}.log"
-
 # Build mysql command line
 function build_mysql_cli() {
     RET="${mysql}"
-    # missing help table version
+    # Missing: "help", "table", "version"
     for v in auto-rehash batch column-names column-type-info comments \
 	compress debug-check debug-info disable-named-commands force \
 	html ignore-spaces line-numbers named-commands no-auto-rehash \
@@ -202,9 +191,9 @@ function build_mysql_cli() {
 	V=${v//-/_}
 	test -z "${!V}" || RET="${RET} --${v}"
     done
-    # Missing databases execute pipe
+    # Missing: "databases", "execute", "pipe", "socket"
     for v in character-sets-dir debug default-character-set delimiter host \
-	local-infile pager password port prompt protocol socket tee user ; do
+	local-infile pager password port prompt protocol tee user ; do
 	V=${v//-/_}
 	test -z "${!V}" || RET="${RET} --${v}=${!V}"
     done
@@ -214,7 +203,7 @@ function build_mysql_cli() {
 # Build mysql dump command line
 function build_mysqldump_cli() {
     RET="${mysqldump}"
-    # missing help pipe table version 
+    # Missing: "help", "pipe", "table", "version"
     for v in add-drop-database add-drop-table add-locks allow-keywords \
 	comments compact complete-insert compress create-options \
 	debug-check debug-info delayed-insert delete-master-logs disable-keys \
@@ -226,11 +215,11 @@ function build_mysqldump_cli() {
 	V=${v//-/_}
 	test -z "${!V}" || RET="${RET} --${v}"
     done
-    # Missing database ignore-table  ssl*
+    # Missing: "database", "ignore-table", "socket", "ssl*"
     for v in character-sets-dir compatible debug default-character-set \
 	fields-terminated-by fields-enclosed-by fields-optionally-enclosed-by \
 	fields-escaped-by host lines-terminated-by log-error master-data \
-	password port protocol result-file socket tab user where; do
+	password port protocol result-file tab user where; do
 	V=${v//-/_}
 	test -z "${!V}" || RET="${RET} --${v}=${!V}"
     done
@@ -240,7 +229,7 @@ function build_mysqldump_cli() {
 # list databases to backup
 function find_db () {
     if test "${DATABASES}" == "ALL"; then
-	dbs=$(${mysql_cli} -e "SHOW DATABASES" | ${sed} 's/ /%/g')
+	dbs=$(${mysql_cli} --socket=/tmp/${mysql_instance}.sock -e "SHOW DATABASES" | ${sed} 's/ /%/g')
     fi
     DATABASES=""
     # Check is database is in the ignore list, then remove it from DATABASES.
@@ -259,7 +248,6 @@ function find_db () {
 
 function build_compression_cli () {
     local extension_prefix=
-
     case ${command} in
 	snapshot)
 	    # Snapshots are always tar based
@@ -298,158 +286,41 @@ function build_compression_cli () {
 function get_backup_file () {
     db=${1}
     ignore_extention=${2}
-    timestamp=$(date +%F)
     if test -n "${ignore_extention}"; then
-	RET="${db}_${timestamp}"
+	RET="${db}_${backup_timestamp}"
     else
-	RET="${db}_${timestamp}.${backup_extension}"
+	RET="${db}_${backup_timestamp}.${backup_extension}"
     fi
 }
 
 
-function cmd_dump() {
-    find_db
-    local dry_run=
-    local bkp_dir="${backup_dir}/dump"
-
-    while test $# -ne 0; do
-	case "$1" in
-	    --dry-run) dry_run=1 ;;
-	    --) shift ; break ;;
-	    -*|*) help 0 ;;
-	esac
-	shift
-    done
-
-    set -x
-
-    log "DAILY backup start"
-    run_hook pre_dump_backup_hook
-
-    # Backup status too
-    get_backup_file "show-master-status" 1
-    local master_status=${RET}
-    get_backup_file "show-slave-status" 1
-    local slave_status=${RET}
-    local mysql_query=$(cat <<EOF
-SLAVE STOP;
-FLUSH TABLES WITH READ LOCK;
-system ${mysql_cli} --column-names -e "SHOW MASTER STATUS\G" > ${bkp_dir}/daily/${master_status}
-system ${mysql_cli} --column-names -e "SHOW SLAVE STATUS\G" >  ${bkp_dir}/daily/${slave_status}
-EOF
-    )
-
-    # backup binlogs
-    cmd "echo '${mysql_query}' | ${mysql} ${mysql_opts}"
-    get_backup_file _binlogs
-    backup_file=${RET}
-    # This is not very potable and has to be fixed.
-    tar cfz ${bkp_dir}/daily/${backup_file} /var/lib/mysql/mysqld*.*
-    archive_bkps "${bkp_dir}" "${backup_file}" "Dump $(hostname)"
-
-    mysql_query=$(cat <<EOF
-UNLOCK TABLES;
-SLAVE START IO_THREAD;
-EOF
-    )
-    cmd "echo '${mysql_query}' | ${mysql} ${mysql_opts}"
-
-
-    for db in ${DATABASES}; do
-	for t in daily weekly monthly; do
-	    mkdir -p "${bkp_dir}/${t}"
-	done
-	log "${db} start"
-	run_hook pre_dump_backup_hook_${db}
-	get_backup_file ${db}
-	backup_file=${RET}
-	cmd "${mysqldump_cli} --databases ${db} | \
-            ${compression_cli} > '${bkp_dir}/daily/${backup_file}'"
-
-	archive_bkps "${bkp_dir}" "${backup_file}" "Dump $(hostname)"
-
-	run_hook post_dump_backup_hook_${db}
-	log "${db} done"
-    done
-
-    mysql_query=$(cat <<EOF
-SLAVE START;
-EOF
-    )
-    cmd "echo '${mysql_query}' | ${mysql} ${mysql_opts}"
-
-    run_hook post_dump_backup_hook
-    log "DAILY backup done"
-}
-
-function cmd_backup () {
-    log "backup function is deprecated and would be soon removed. Please use dump command instead."
-    cmd_dump "$@"
-}
-
-
-# do archive backups
-# $1 => root directory for backups
-# $2 => backup file name
-# $3 => db name (for loggin purposes
-function archive_bkps () {
-    local bkp_dir="$1"
-    local backup_file="$2"
-    local db="$3"
-
-    # Keep weekly archives
-    if test "$(date +%w)" == "${WEEKLY_DAY}"; then
-	log "${db} weekly"
-	cmd ln -f "${bkp_dir}/daily/${backup_file}" "${bkp_dir}/weekly/${backup_file}"
-    fi
-    # remove old weekly archives
-    cmd "find '${bkp_dir}/weekly' -type f -mtime +${WEEKLY_RETENTION} -print0 | \
-	xargs -0 --no-run-if-empty rm"
-    # Keep monthly archives
-    if test "$(date +%d)" == "${MONTHLY_DAY}"; then
-	log "${db} monthly"
-	cmd ln -f "${bkp_dir}/daily/${backup_file}" "${bkp_dir}/monthly/${backup_file}"
-    fi
-    # remove old monthly archives
-    cmd "find '${bkp_dir}/monthly' -type f -mtime +${MONTHLY_RETENTION} -print0 | \
-	xargs -0 --no-run-if-empty rm"
-    # remove old daily archives
-    cmd "find '${bkp_dir}/daily' -type f -mtime +${DAILY_RETENTION} -print0 | \
-	xargs -0 --no-run-if-empty rm"
-}
-
-
-
-function cmd_snapshot () {
-    local _datadir=$(${mysql_cli} -e "SHOW VARIABLES LIKE 'datadir'" \
+function do_snapshot () {
+    local _datadir=$(${mysql_cli} --socket="${socket}" -e "SHOW VARIABLES LIKE 'datadir'" \
 	| sed -e 's,\(^datadir[[:space:]]\+\|/$\),,g')
     test -z "${_datadir}" && die "Cannot connect to mysql server"
     local datadir=$(readlink ${_datadir})
     if test -z "${datadir}"; then
 	datadir="${_datadir}"
     fi
-    local mountpoint=$(df ${datadir} | awk '{if(NF==6){print $NF}}')
-    local datadir_dev=$(df ${datadir} | awk '{if(NF==6){print $1}}' \
+    local mountpoint=$(df -P ${datadir} | awk '{if(NF==6){print $NF}}')
+    local datadir_dev=$(df -P ${datadir} | awk '{if(NF==6){print $1}}' \
 	| xargs ${lvdisplay} -c  | cut -d: -f1)
 
     if test -z "${datadir}"; then
 	die "LVM not installed or LVM commands not found or ${datadir} is not in LVM."
     fi
 
-    local lvm_snapshot="${datadir_dev}${LVM_EXT}"
+    lvm_snapshot="${datadir_dev}${LVM_EXT}"
     local fs_type=$(mount | sed -n "s,.* on ${mountpoint} type \([^[:space:]]\+\).*,\1,p")
-    local mount_opts="-o ro,noexec,nosuid,nodev"
+    local mount_opts="-o rw,noexec,nosuid,nodev"
     if test "${fs_type}" == "xfs"; then
 	mount_opts="${mount_opts} -o nouuid"
 	# Do not freeze XFS since LVM change a mount: unknown filesystem
 	# type 'DM_snapshot_cow' error happens
     fi
 
-    local datadir_path=$(echo "${datadir}" | sed -e "s,^${mountpoint}/\?,,")
+    datadir_path=$(echo "${datadir}" | sed -e "s,^${mountpoint}/\?,,")
 
-    get_backup_file "$(hostname)"
-    local snapshot_file=${RET}
-    local bkp_dir="${backup_dir}/snapshot"
     local mysql_query=
 
     local no_archive=
@@ -464,7 +335,6 @@ function cmd_snapshot () {
 	shift
     done
 
-    test -z "${dry_run}" && log "DAILY snapshot start"
 
     if test -n "${dry_run}"; then
 	cat<<EOF
@@ -481,6 +351,7 @@ EOF
     run_hook pre_snapshot_backup_hook
 
     ${lvdisplay} -c | grep -F ${lvm_snapshot} > /dev/null 2>&1
+    # remove existing mounts
     if test $? -eq 0; then
 	cmd ${umount} ${TARGET_MOUNT} ${quiet}
 	cmd ${lvremove} ${LVREMOVE_OPTS} ${lvm_snapshot} ${quiet}
@@ -491,201 +362,255 @@ EOF
     mysql_query=$(cat <<EOF
 SLAVE STOP;
 FLUSH TABLES WITH READ LOCK;
-system ${mysql_cli} --column-names -e "SHOW MASTER STATUS\G" > ${datadir}/show-master-status
-system ${mysql_cli} --column-names -e "SHOW SLAVE STATUS\G" > ${datadir}/show-slave-status
+system ${mysql_cli} --socket="${socket}" --column-names -e "SHOW MASTER STATUS\G" > ${datadir}/show-master-status
+system ${mysql_cli} --socket="${socket}" --column-names -e "SHOW SLAVE STATUS\G" > ${datadir}/show-slave-status
 system ${lvcreate} -s --size ${LVM_SNAPSHOT_SIZE} -n ${lvm_snapshot} ${LVCREATE_OPTS} ${datadir_dev} > /dev/null 2>&1
 UNLOCK TABLES;
 SLAVE START;
 EOF
     )
 
-    cmd "echo '${mysql_query}' | ${mysql} ${mysql_opts}"
+    cmd "echo '${mysql_query}' | ${mysql_cli} --socket=\"${socket}\""
     run_hook post_snapshot_backup_lvm_snaphost_hook
 
     cmd mkdir -p ${TARGET_MOUNT}
     cmd ${mount} ${mount_opts} ${lvm_snapshot} ${TARGET_MOUNT}
 
+
+}
+
+
+function remove_snapshot () {
+    cmd ${umount} ${TARGET_MOUNT} ${quiet}
+    cmd ${lvremove} ${LVREMOVE_OPTS} ${lvm_snapshot} ${quiet}
+}
+
+
+
+function start_mysqld_for_backup() {
+    local innodb_data_file=$(${my_print_defaults} ${mysql_instance} | \
+	grep innodb_data_file)
+    local mysql_bkp="${mysqld} --read-only --skip-networking ${innodb_data_file} \
+	--datadir=${TARGET_MOUNT}/${datadir_path} \
+	--skip-slave-start --socket=/tmp/${mysql_instance}.sock \
+	--pid=/tmp/${mysql_instance}.pid \
+	--log-error=/tmp/${mysql_instance}.log > /dev/null 2>&1 &"
+
+    cmd $mysql_bkp
+
+    if test -n "${dry_run}"; then
+	return
+    fi
+
+    # test if new mysql instance can be reached.
+    for i in `seq 60`; do
+	sleep 1
+	cmd "${mysqladmin} \
+            --defaults-extra-file='${mysqladmin_extra_file}' \
+            --socket=/tmp/${mysql_instance}.sock ping > /dev/null 2>&1"
+	ec=$?
+	if test $ec -eq 0; then
+	    break
+	# else
+	#     echo " $i $ec"
+	fi
+    done
+}
+
+function stop_mysqld_for_backup() {
+    local innodb_data_file=$(${my_print_defaults} ${mysql_instance} | \
+	grep innodb_data_file)
+
+    local mysql_bkp="${mysqladmin}
+        --defaults-extra-file="${mysqladmin_extra_file}" \
+	--socket=/tmp/${mysql_instance}.sock shutdown"
+    cmd $mysql_bkp
+}
+
+
+
+# do archive backups
+# $1 => root directory for backups
+# $2 => backup file name
+# $3 => db name (for loggin purposes
+function archive_bkps () {
+    local bkp_dir="$1"
+    local backup_file="$2"
+    local db="$3"
+
+    # Keep weekly archives
+    if test "$this_week_day" == "${WEEKLY_DAY}"; then
+	log "${db} weekly"
+	cmd ln -f "${bkp_dir}/daily/${backup_file}" "${bkp_dir}/weekly/${backup_file}"
+    fi
+    # remove old weekly archives
+    cmd "find '${bkp_dir}/weekly' -type f -mtime +${WEEKLY_RETENTION} -print0 | \
+	xargs -0 --no-run-if-empty rm"
+    # Keep monthly archives
+    if test "$this_month_day" == "${MONTHLY_DAY}"; then
+	log "${db} monthly"
+	cmd ln -f "${bkp_dir}/daily/${backup_file}" "${bkp_dir}/monthly/${backup_file}"
+    fi
+    # remove old monthly archives
+    cmd "find '${bkp_dir}/monthly' -type f -mtime +${MONTHLY_RETENTION} -print0 | \
+	xargs -0 --no-run-if-empty rm"
+    # remove old daily archives
+    cmd "find '${bkp_dir}/daily' -type f -mtime +${DAILY_RETENTION} -print0 | \
+	xargs -0 --no-run-if-empty rm"
+}
+
+
+
+
+
+function do_binary_backup() {
+    get_backup_file "${HOST}"
+    local snapshot_file=${RET}
+    local bkp_dir="${backup_dir}/binary"
+
     for t in daily weekly monthly; do
 	cmd mkdir -p "${bkp_dir}/${t}"
     done
 
-    if test -z "${no_archive}"; then
-	run_hook pre_snapshot_backup_archive_hook
-	cmd "${tar} ${tar_opts} -C ${TARGET_MOUNT}/${datadir_path} -c -f - . | \
-            ${compression_cli} ${compression_opts} > ${bkp_dir}/daily/${snapshot_file}"
-	archive_bkps "${bkp_dir}" "${snapshot_file}" "Snapshot $(hostname)"
-
-	## Do text backup from LVM snapshot
-	## NEW:
-	local mysql_cli_bkp="${mysql_cli}"
-	mysql_cli="${mysql_cli} --socket=/tmp/mysqld.sock"
-	local mysqldump_cli_bkp="${mysqldump_cli}"
-	mysqldump_cli="${mysqldump_cli} --socket=/tmp/mysqld.sock"
-	local bkp_dir_bkp="${bk_dir}"
-	bkp_dir="${backup_dir}/dump"
-
-
-
-	for t in daily weekly monthly; do
-	    cmd mkdir -p "${bkp_dir}/${t}"
-	done
-
-
-	get_backup_file "${bkp_dir}/daily/ls_1" 1
-	cmd "find  ${TARGET_MOUNT}/${datadir_path} -type f -print0 | xargs -0 ls -l > ${RET}"
-	get_backup_file "${bkp_dir}/daily/md5sum_1" 1
-	cmd "find  ${TARGET_MOUNT}/${datadir_path} -type f -print0 | xargs -0 md5sum > ${RET}"
-
-
-
-
-	cmd ${mount} -o remount,rw ${TARGET_MOUNT}
-
-	get_backup_file "${bkp_dir}/daily/mysqld.err" 1
-	local mysql_log=${RET}
-	touch ${mysql_log}
-	chown mysql.mysql ${mysql_log}
-
-	cmd "mysqld --read-only --skip-networking --datadir=${TARGET_MOUNT}/${datadir_path} \
-	    --skip-slave-start  --socket=/tmp/mysqld.sock \
-	    --pid=/tmp/mysqld.pid --log-error=${mysql_log} >/dev/null 2>&1 &"
-
-	# test if new mysql instance can be reached.
-	for i in `seq 60`; do
-	    sleep 1
-	    cmd "${mysqladmin} --socket=/tmp/mysqld.sock ping > /dev/null 2>&1"
-	    ec=$?
-	    if test $ec -eq 0; then
-		break
-	    else
-		echo " $i $ec"
-	    fi
-
-	done
-
-	find_db
-
-	for db in ${DATABASES}; do
-	    log "${db} start"
-	    run_hook pre_dump_backup_hook_${db}
-	    get_backup_file ${db}
-	    backup_file=${RET}
-	    cmd "${mysqldump_cli} --databases ${db} | \
-            ${compression_cli} > '${bkp_dir}/daily/${backup_file}'"
-
-	    archive_bkps "${bkp_dir}" "${backup_file}" "Dump $(hostname)"
-
-	    run_hook post_dump_backup_hook_${db}
-	    log "${db} done"
-	done
-
-	archive_bkps "${bkp_dir}" "${mysql_log}" "Dump $(hostname)"
-
-	get_backup_file "${bkp_dir}/daily/ls_2" 1
-	cmd "find  ${TARGET_MOUNT}/${datadir_path} -type f -print0 | xargs -0 ls -l > ${RET}"
-	get_backup_file "${bkp_dir}/daily/md5sum_2" 1
-	cmd "find  ${TARGET_MOUNT}/${datadir_path} -type f -print0 | xargs -0 md5sum > ${RET}"
-
-	cmd ${mysqladmin} --socket=/tmp/mysqld.sock shutdown
-	mysql_cli="${mysql_cli_bkp}"
-	mysqldump_cli="${mysqldump_cli_bkp}"
-	bkp_dir="${bkp_dir}"
-
-
-	run_hook post_snapshot_backup_archive_hook
-	cmd ${umount} ${TARGET_MOUNT} ${quiet}
-	cmd ${lvremove} ${LVREMOVE_OPTS} ${lvm_snapshot} ${quiet}
+    test -z "${dry_run}" && log "DAILY snapshot start"
+    cmd "${tar} ${tar_opts} -C ${TARGET_MOUNT}/${datadir_path} -c -f - . | \
+      ${compression_cli} ${compression_opts} > ${bkp_dir}/daily/${snapshot_file}"
+    if test $? -eq 0; then
+	test -z "${dry_run}" && log "DAILY snapshot done."
     else
-	if test -z "${dry_run}"; then
-	    cat <<EOF
-A snapshot image is available in ${TARGET_MOUNT}
-
-When done, you can remove it using:
-
-${umount} ${TARGET_MOUNT}
-${lvremove} ${LVREMOVE_OPTS} ${lvm_snapshot}
-
-EOF
-	fi
-	
+	test -z "${dry_run}" && log "DAILY snapshot failed."
+	echo "DAILY snapshot failed."
     fi
 
-    run_hook post_snapshot_backup_hook
-    log "DAILY snapshot done"
+    archive_bkps "${bkp_dir}" "${snapshot_file}" "Snapshot $HOST"
+
 }
 
-# This has to be done
-function cmd_restore() {
-    local dry_run=
-    local date=
-    local bases=
+
+function get_logs_dir() {
+    RET=$(${my_print_defaults} mysqld ${mysql_instance} | ${awk} -F= \
+	'{if($1~/^--(log_bin|relay_log)/){o[$1]=$2}}END{for(k in o){print o[k]}}')
+}
+
+function do_dump_backup() {
+    get_backup_file "${HOST}"
+    local snapshot_file=${RET}
     local bkp_dir="${backup_dir}/dump"
 
-    while test $# -ne 0; do
-	case "$1" in
-	    --dry-run) dry_run=1 ;;
-	    --date) test -z "$2" && die "Need a parameter for $1."
-		date=$2
-		shift
-		;;
-	    --bases) test -z "$2" && die "Need a parameter for $1."
-		bases=$2
-		shift
-		;;
-	    --) shift ; break ;;
-	    -*|*) help 0 ;;
-	esac
-	shift
+    for t in daily weekly monthly; do
+	cmd mkdir -p "${bkp_dir}/${t}"
     done
 
-    if test -z "${date}"; then
-	date=$(find "${bkp_dir}" -type f -name '*.sql*' | \
-	    ${sed} -n 's,^.*/[^/]\+_\([0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}\)[^/]*$,\1,p' | \
-	    ${sort} | ${tail} -n1)
-    fi
+    find_db
 
-    if test -z "${bases}"; then
-	bases=$(find "${bkp_dir}" -type f -name '*.sql*' | \
-	    ${sed} -n 's,^.*/\([^/]\+\)_[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}[^/]*$,\1,p' | \
-	    ${sort} | ${uniq} )
-    fi
-    test -z "${dry_run}" && run_hook pre_dump_restore_hook
-    for base in ${bases}; do
-	file_to_restore=
+    test -z "${dry_run}" && log "DAILY dump start."
+
+    for db in ${DATABASES}; do
 	for t in daily weekly monthly; do
-	    file_to_restore="${bkp_dir}/${t}/${base}_${date}.${backup_extension}"
-	    if test -r "${file_to_restore}"; then
-		break
-	    else
-		file_to_restore=
-	    fi
+	    mkdir -p "${bkp_dir}/${t}"
 	done
-	if test -z "${file_to_restore}"; then
-	    echo "Could not find a backup archive for ${base} on ${date}."
-	    continue
-	fi
-	if test -n "${dry_run}"; then
-	    echo "${extract_cli} \"${file_to_restore}\" | ${mysql_cli}"
+	run_hook pre_dump_backup_hook_${db}
+	get_backup_file ${db}
+	backup_file=${RET}
+
+ 	log "Dump table ${db} start"
+	cmd "${mysqldump_cli} --socket=/tmp/${mysql_instance}.sock \
+            --databases ${db} |
+            ${compression_cli} > '${bkp_dir}/daily/${backup_file}'"
+	if test $? -eq 0; then
+	    test -z "${dry_run}" && log "Dump table ${db} finished."
 	else
-	    ### COPY PREVIOUS LINE WITHOUT ECHO
-	    run_hook pre_dump_restore_hook_${base}
-	    log "Restoring ${base} from ${date} on ${HOST}."
-	    echo "DO REAL RESTORE"
-	    log "Restoring ${base} from ${date} on ${HOST} done."
-	    run_hook post_dump_restore_hook_${base}
+	    test -z "${dry_run}" && log "Dump table ${db} failed."
+	    echo "Dump table ${db} failed."
 	fi
+	archive_bkps "${bkp_dir}" "${backup_file}" "Dump $HOST"
+	run_hook post_dump_backup_hook_${db}
     done
-    test -z "${dry_run}" && run_hook post_dump_restore_hook
+
+
+    # TODO: Backup logs
+    logs_files=""
+    get_logs_dir
+    for d in $RET '*.info' 'show-*-status'; do
+	logs_files="${logs_files} $d*";
+    done
+    get_backup_file "__logs"
+    backup_file=${RET}
+
+    cmd "cd ${TARGET_MOUNT}/${datadir_path} && ${tar} ${tar_opts} -c -f - ${logs_files} | \
+      ${compression_cli} ${compression_opts} > ${bkp_dir}/daily/${backup_file}; cd - 2>&1 >/dev/null"
+
+    archive_bkps "${bkp_dir}" "${backup_file}" "Dump $HOST"
+
+    test -z "${dry_run}" && log "DAILY dump finished."
+
 }
 
 
-# main
+
+
+
+function do_backup () {
+    test -z "${dry_run}" && log "DAILY backup start."
+
+    do_snapshot
+    if test -n "${cli_snapshot}"; then
+	start_mysqld_for_backup
+	stop_mysqld_for_backup
+	command=snapshot
+	build_compression_cli
+	do_binary_backup
+    fi
+
+    if test -n "${cli_dump}"; then
+	start_mysqld_for_backup
+	command=dump
+	do_dump_backup
+	build_compression_cli
+	stop_mysqld_for_backup
+    fi
+
+    remove_snapshot
+    test -z "${dry_run}" && log "DAILY backup finish."
+}
+
+
+
+# Parse the command line
+while test $# != 0; do
+    case "$1" in
+	--dump|-d) cli_dump=1 ;;
+	--snapshot|-s) cli_snapshot=1 ;;
+        -c|--config)
+            test -z "$2" && die "Need a parameter for $1."
+            cli_config=$2
+            shift
+            ;;
+	--dry-run) dry_run=1;;
+        -v|--verbose) cli_verbose=1 ;;
+        --help|-h) usage 0 ;;
+	--) shift; break ;;
+        -*|*) usage ;;
+    esac
+    shift
+done
+
+# Finally load configuration file.
+if test -r "${cli_config}"; then
+    source "${cli_config}"
+fi
+
+if test -z "${cli_dump}" -a -z "${cli_snapshot}"; then
+    die "Either --dump or --snapshot must be provided."
+fi
+
+
+backup_dir="${BACKUP_DIR}/${HOST}"
+backup_log="/var/log/mysql-backup/${HOST}.log"
 
 build_mysql_cli
 build_mysqldump_cli
-build_compression_cli
 
-test -z "${command}" && die "No command specified"
-"cmd_${command}" "$@"
 
-exit
+
+do_backup
