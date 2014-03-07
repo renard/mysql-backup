@@ -1,13 +1,13 @@
 '\" t
 .\"     Title: mysql-backup
 .\"    Author: [see the "AUTHORS" section]
-.\" Generator: DocBook XSL Stylesheets v1.75.2 <http://docbook.sf.net/>
-.\"      Date: 02/10/2012
+.\" Generator: DocBook XSL Stylesheets v1.76.1 <http://docbook.sf.net/>
+.\"      Date: 03/07/2014
 .\"    Manual: \ \&
 .\"    Source: \ \&
 .\"  Language: English
 .\"
-.TH "MYSQL\-BACKUP" "1" "02/10/2012" "\ \&" "\ \&"
+.TH "MYSQL\-BACKUP" "1" "03/07/2014" "\ \&" "\ \&"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -32,7 +32,7 @@ mysql-backup \- Backup MySQL databases\&.
 .SH "SYNOPSIS"
 .sp
 .nf
-mysql\-backup [ options ] command [ command options ]
+mysql\-backup [ options ] [ \-\-dump | \-\-snapshot ]
 .fi
 .SH "DESCRIPTION"
 .sp
@@ -90,17 +90,6 @@ Rotate backups
 .sp -1
 .IP \(bu 2.3
 .\}
-Perform restoration
-.RE
-.sp
-.RS 4
-.ie n \{\
-\h'-04'\(bu\h'+03'\c
-.\}
-.el \{\
-.sp -1
-.IP \(bu 2.3
-.\}
 more\&...
 .RE
 .SH "ARGUMENTS"
@@ -120,18 +109,26 @@ Run in verbose mode\&.
 .RS 4
 Show a short help screen\&.
 .RE
-.SS "Commands"
-.sp
-There are only three commands:
 .PP
-dump
+\-\-dry\-run
 .RS 4
-Perform a mysqldump backup\&.
+Run un
+\fBdry\-run\fR
+mode, do not perform any action\&.
 .RE
 .PP
-restore
+\-\-dump, \-d
 .RS 4
-Performs the restoration of a previously done mysqldump backup\&.
+Do a
+mysqldump
+backup\&.
+.RE
+.PP
+\-\-snapshot, \-s
+.RS 4
+Perform a binary backup using
+lvm
+snapshot\&.
 .RE
 .if n \{\
 .sp
@@ -148,71 +145,6 @@ Performs the restoration of a previously done mysqldump backup\&.
 .sp
 To restore a LVM snapshot you just need to untar the archive\&.
 .sp .5v
-.RE
-.PP
-snapshot
-.RS 4
-Perform a LVM snapshot backup\&.
-.RE
-.SS "Command options"
-.sp
-Each command has its own set of options\&.
-.sp
-.it 1 an-trap
-.nr an-no-space-flag 1
-.nr an-break-flag 1
-.br
-.ps +1
-\fBdump options\fR
-.RS 4
-.PP
-\-\-dry\-run
-.RS 4
-Run backup in a dry\-run mode: nothing would be done for real\&. Commands to run are displayed on the screen\&.
-.RE
-.RE
-.sp
-.it 1 an-trap
-.nr an-no-space-flag 1
-.nr an-break-flag 1
-.br
-.ps +1
-\fBRestore options\fR
-.RS 4
-.PP
-\-\-dry\-run
-.RS 4
-Run restore in a dry\-run mode: nothing would be done for real\&. Commands to run are displayed on the screen\&.
-.RE
-.PP
-\-\-date DATE
-.RS 4
-Restore backups for given date\&. If this option is not set, the last found backup would be restored\&.
-.RE
-.PP
-\-\-bases BASES
-.RS 4
-Restore backups for given set of databases\&. If this option is not set all found databases would be restored\&.
-.RE
-.RE
-.sp
-.it 1 an-trap
-.nr an-no-space-flag 1
-.nr an-break-flag 1
-.br
-.ps +1
-\fBsnapshot options\fR
-.RS 4
-.PP
-\-\-dry\-run
-.RS 4
-Run backup in a dry\-run mode: nothing would be done for real\&. Commands to run are displayed on the screen\&.
-.RE
-.PP
-\-\-no\-archive
-.RS 4
-Simply do the snapshot and mount the LVM volume\&. The user is responsible of the snapshot umount an deletion\&.
-.RE
 .RE
 .SH "CONFIGURATION FILE"
 .SS "Default configuration"
@@ -276,7 +208,7 @@ Where the backups files would be stored\&. A generic backup file schema is:
 .RS 4
 .\}
 .nf
-<BACKUP_DIR>/<host>/<daily|weekly|monthly>/<base>_YYYY\-MM\-DD\&.sql[\&.<COMPRESSION_EXTENSION>]
+<BACKUP_DIR>/<host>/<binary|dump>/<daily|weekly|monthly>/<base>_YYYY\-MM\-DD\&.sql[\&.<COMPRESSION_EXTENSION>]
 .fi
 .if n \{\
 .RE
@@ -305,7 +237,9 @@ IGNORE_DATABASES
 .RS 4
 A list of database to ignore during backup\&. By default,
 \fBinformation_schema\fR
-is ignored\&.
+and
+\fBperformance_schema\fR
+are ignored\&.
 .RE
 .sp
 In addition to that option all mysql(1) and mysqldump(1) options are also recognized as long as dash (\fB\-\fR) are changed to underscore (\fB_\fR)\&.
@@ -337,6 +271,53 @@ skip_column_names=1
 quote_names=1
 opt=1
 add_drop_database=1
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+EXAMPLE: If you use mysqld_multi you can defined a common complex configuration file (ie\&. /etc/mysql\-backup/__multi\-defaults\&.inc) such as:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+BACKUP_DIR=/var/backups/mysql/
+ HOST=articles${_instance}
+TARGET_MOUNT=/tmp/$HOST\-bck
+LVM_SNAPSHOT_SIZE="100G"
+mysql_instance=mysqld${_instance}
+proto=SOCKET
+socket=/var/run/mysqld/mysqld_${_instance}\&.sock
+tar_opts=""
+mysqladmin_extra_file=/etc/mysql/debian_${_instance}\&.cnf
+user=$(${my_print_defaults} \-c ${mysqladmin_extra_file} client | awk \-F= \*(Aq{if($1~/^\-\-user$/){print $2}}\*(Aq)
+password=$(${my_print_defaults} \-c ${mysqladmin_extra_file} client | awk \-F= \*(Aq{if($1~/^\-\-password$/){print $2}}\*(Aq)
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+and an instance specific configuration in (/etc/mysql\-backup/instance00\&.cnf):
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+instance=00
+source /etc/mysql\-backup/__multi\-defaults\&.inc
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+And a cron such as:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+01 00 * * * root mysql\-backup \-c /etc/mysql\-backup/instance00\&.cnf \-\-snapshot
 .fi
 .if n \{\
 .RE
@@ -492,9 +473,47 @@ This system keeps space on the backup server by the use of hard links\&.
 .ps -1
 .br
 .sp
-This only woks if all backups are in a single partition\&.
+This only works if all backups are in a single partition\&.
 .sp .5v
 .RE
+.SS "How is this done?"
+.sp
+First mysql\-backup generate a LVM snapshot of the mysql you want to backup\&. During that snapshot creation the replication is stopped, the tables are locked ("FLUSH TABLES WITH READ LOCK")\&. Then the current replication status (for both master and slave) are dumped into mysql datadir in files show\-master\-satus and show\-slave\-slatus\&.
+.sp
+For each kind of backup (snapshot or dump) an other mysqld instance is started using the new lvm snapshot as datadir\&. This will ensure the rebuild of innodb journal and indexes\&. Then the archive process is run (mysqldump for dump and tar for snapshot)\&.
+.if n \{\
+.sp
+.\}
+.RS 4
+.it 1 an-trap
+.nr an-no-space-flag 1
+.nr an-break-flag 1
+.br
+.ps +1
+\fBNote\fR
+.ps -1
+.br
+.sp
+For big databases you\(cqd better want to use a snapshot backup since the archive process would be faster and the restoration either\&.
+.sp .5v
+.RE
+.sp
+Once every backup are done, the lvm snapshot is removed\&.
+.SH "RESTORATION PROCEDURE"
+.sp
+For binary snapshot you only need to untar the archive on a new server to create a clone\&.
+.sp
+For dump backups, you need to replay every database files, such as:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+zcat base_YYY\-MM\-DD\&.sql\&.gz | mysql \-
+.fi
+.if n \{\
+.RE
+.\}
 .SH "HOOKS DETAILS"
 .SS "Dump hooks"
 .PP
@@ -579,7 +598,7 @@ Hook to be run after the archive process is done\&.
 .ps -1
 .br
 .sp
-There is no batabase postfix for snapshot hooks since there would be nonsense\&.
+There is no database postfix for snapshot hooks since there would be nonsense\&.
 .sp .5v
 .RE
 .SH "SEE ALSO"
@@ -628,7 +647,48 @@ gzip(1), bzip2(1), xz(1)
 run\-parts(8)
 .RE
 .SH "HISTORY"
+.SS "Version 2\&.0"
+.PP
+2014\-03\-06
+.RS 4
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+rewrite the core application\&.
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+bump to version 2\&.0
+.RE
+.RE
 .SS "Version 1\&.9"
+.PP
+2012\-06\-04
+.RS 4
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+Add replication information for dumps
+.RE
 .sp
 .RS 4
 .ie n \{\
@@ -652,6 +712,7 @@ Add snapshot option
 Add
 \fBLVCREATE_OPTS\fR
 .RE
+.RE
 .SS "Version 1\&.0"
 .PP
 2010\-09\-06
@@ -666,6 +727,6 @@ No time to include bugs, command actions might seldom lead astray user\(cqs assu
 mysql\-backup is written by S\('ebastien Gross <seb\(buɑƬ\(buchezwam\(buɖɵʈ\(buorg>\&.
 .SH "COPYRIGHT"
 .sp
-Copyright \(co 2010\-2012 S\('ebastien Gross <seb\(buɑƬ\(buchezwam\(buɖɵʈ\(buorg>\&.
+Copyright \(co 2010\-2014 S\('ebastien Gross <seb\(buɑƬ\(buchezwam\(buɖɵʈ\(buorg>\&.
 .sp
 Released under GNU GPL version 3 or higher (\m[blue]\fBhttp://www\&.gnu\&.org/licenses/gpl\&.html\fR\m[])\&.
