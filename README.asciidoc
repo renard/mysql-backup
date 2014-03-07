@@ -6,7 +6,7 @@ mysql-backup - Backup MySQL databases.
 
 == SYNOPSIS ==
 
-  mysql-backup [ options ] command [ command options ]
+  mysql-backup [ options ] [ --dump | --snapshot ]
 
 == DESCRIPTION ==
 
@@ -17,7 +17,6 @@ Features:
   - Compress backup files
   - Backup remote servers
   - Rotate backups
-  - Perform restoration
   - more...
 
 == ARGUMENTS ==
@@ -37,63 +36,20 @@ Features:
 
   Show a short help screen.
 
-=== Commands ===
+--dry-run::
 
-There are only three commands:
+  Run un *dry-run* mode, do not perform any action.
 
-dump::
+--dump, -d::
 
-  Perform a mysqldump backup.
+  Do a +mysqldump+ backup.
 
-restore::
+--snapshot, -s::
 
-  Performs the restoration of a previously done mysqldump backup.
+  Perform a binary backup using +lvm+ snapshot.
+
 
 NOTE: To restore a LVM snapshot you just need to untar the archive.
-
-snapshot::
-
-  Perform a LVM snapshot backup.
-
-=== Command options ===
-
-Each command has its own set of options.
-
-==== dump options ====
-
---dry-run::
-
-  Run backup in a dry-run mode: nothing would be done for real. Commands to
-  run are displayed on the screen.
-
-==== Restore options ====
-
---dry-run::
-
-  Run restore in a dry-run mode: nothing would be done for real. Commands to
-  run are displayed on the screen.
-
---date DATE::
-
-  Restore backups for given date. If this option is not set, the last found
-  backup would be restored.
-
---bases BASES::
-
-  Restore backups for given set of databases. If this option is not set all
-  found databases would be restored.
-
-==== snapshot options ====
-
---dry-run::
-
-  Run backup in a dry-run mode: nothing would be done for real. Commands to
-  run are displayed on the screen.
-
---no-archive::
-
-  Simply do the snapshot and mount the LVM volume. The user is responsible
-  of the snapshot umount an deletion.
 
 
 == CONFIGURATION FILE ==
@@ -120,7 +76,7 @@ BACKUP_DIR::
 
   Where the backups files would be stored. A generic backup file schema is:
 
-    <BACKUP_DIR>/<host>/<daily|weekly|monthly>/<base>_YYYY-MM-DD.sql[.<COMPRESSION_EXTENSION>]
+    <BACKUP_DIR>/<host>/<binary|dump>/<daily|weekly|monthly>/<base>_YYYY-MM-DD.sql[.<COMPRESSION_EXTENSION>]
 
 ==== MySQL options ====
 
@@ -133,7 +89,7 @@ DATABASES::
 IGNORE_DATABASES::
 
   A list of database to ignore during backup. By default,
-  *information_schema* is ignored.
+  *information_schema* and *performance_schema* are ignored.
 
 In addition to that option all mysql(1) and mysqldump(1) options are also
 recognized as long as dash (*-*) are changed to underscore (*_*).
@@ -149,6 +105,30 @@ EXAMPLE: This is the default MySQL configuration:
   opt=1
   add_drop_database=1
 
+
+EXAMPLE: If you use +mysqld_multi+ you can defined a common complex
+configuration file (ie. +/etc/mysql-backup/__multi-defaults.inc+) such as:
+
+   BACKUP_DIR=/var/backups/mysql/
+    HOST=articles${_instance}
+   TARGET_MOUNT=/tmp/$HOST-bck
+   LVM_SNAPSHOT_SIZE="100G"
+   mysql_instance=mysqld${_instance}
+   proto=SOCKET
+   socket=/var/run/mysqld/mysqld_${_instance}.sock
+   tar_opts=""
+   mysqladmin_extra_file=/etc/mysql/debian_${_instance}.cnf
+   user=$(${my_print_defaults} -c ${mysqladmin_extra_file} client | awk -F= '{if($1~/^--user$/){print $2}}')
+   password=$(${my_print_defaults} -c ${mysqladmin_extra_file} client | awk -F= '{if($1~/^--password$/){print $2}}')
+
+and an instance specific configuration in (+/etc/mysql-backup/instance00.cnf+):
+
+    instance=00
+    source /etc/mysql-backup/__multi-defaults.inc
+
+And a cron such as:
+
+   01 00 * * * root mysql-backup -c /etc/mysql-backup/instance00.cnf --snapshot
 
 ==== Archive options ====
 
@@ -235,7 +215,37 @@ After that archives older that *DAILY_RETENTION*, *WEEKLY_RETENTION* and
 
 This system keeps space on the backup server by the use of hard links.
 
-NOTE: This only woks if all backups are in a single partition.
+NOTE: This only works if all backups are in a single partition.
+
+
+=== How is this done?
+
+First +mysql-backup+ generate a +LVM+ snapshot of the +mysql+ you want to
+backup. During that snapshot creation the replication is stopped, the tables
+are locked ("FLUSH TABLES WITH READ LOCK"). Then the current replication
+status (for both master and slave) are dumped into mysql +datadir+ in files
++show-master-satus+ and +show-slave-slatus+.
+
+For each kind of backup (snapshot or dump) an other +mysqld+ instance is
+started using the new +lvm+ snapshot as +datadir+. This will ensure the
+rebuild of innodb journal and indexes. Then the archive process is run
+(+mysqldump+ for dump and +tar+ for snapshot).
+
+NOTE: For big databases you'd better want to use a snapshot backup since the
+archive process would be faster and the restoration either.
+
+Once every backup are done, the +lvm+ snapshot is removed.
+
+
+== Restoration procedure
+
+For binary snapshot you only need to untar the archive on a new server to
+create a clone.
+
+For dump backups, you need to replay every database files, such as:
+
+    zcat base_YYY-MM-DD.sql.gz | mysql -
+
 
 == HOOKS DETAILS ==
 
@@ -291,7 +301,7 @@ post_snapshot_backup_archive_hook::
 
   Hook to be run after the archive process is done.
 
-NOTE: There is no batabase postfix for snapshot hooks since there would be
+NOTE: There is no database postfix for snapshot hooks since there would be
 nonsense.
 
 == SEE ALSO ==
@@ -302,6 +312,14 @@ nonsense.
  - run-parts(8)
 
 == HISTORY ==
+
+=== Version 2.0 ===
+
+2014-03-06::
+
+- rewrite the core application.
+- bump to version 2.0
+
 
 === Version 1.9 ===
 
@@ -329,7 +347,7 @@ user's assumption.
 
 == COPYRIGHT ==
 
-Copyright © 2010-2012 Sébastien Gross <seb•ɑƬ•chezwam•ɖɵʈ•org>.
+Copyright © 2010-2014 Sébastien Gross <seb•ɑƬ•chezwam•ɖɵʈ•org>.
 
 Released under GNU GPL version 3 or higher
 (http://www.gnu.org/licenses/gpl.html[]).
