@@ -319,7 +319,7 @@ function do_snapshot () {
 	# type 'DM_snapshot_cow' error happens
     fi
 
-    datadir_path=$(echo "${datadir}" | sed -e "s,^${mountpoint}/\?,,")
+    datadir_path=$(python -c "import os; print(os.path.realpath('${datadir}'))" | sed -e "s,^${mountpoint}/\?,,")
 
     local mysql_query=
 
