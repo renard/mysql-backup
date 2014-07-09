@@ -70,6 +70,7 @@ mysqld=$(which mysqld)
 mysqldump=$(which mysqldump)
 mysqladmin=$(which mysqladmin)
 my_print_defaults=$(which my_print_defaults)
+my_print_defaults_opts=mysqld
 awk=$(which awk)
 sed=$(which sed)
 sort=$(which sort)
@@ -388,7 +389,7 @@ function remove_snapshot () {
 
 
 function start_mysqld_for_backup() {
-    local innodb_data_file=$(${my_print_defaults} ${mysql_instance} | \
+    local innodb_data_file=$(${my_print_defaults} ${my_print_defaults_opts} | \
 	grep innodb_data_file)
     local mysql_bkp="${mysqld} --read-only --skip-networking ${innodb_data_file} \
 	--datadir=${TARGET_MOUNT}/${datadir_path} \
@@ -418,7 +419,7 @@ function start_mysqld_for_backup() {
 }
 
 function stop_mysqld_for_backup() {
-    local innodb_data_file=$(${my_print_defaults} ${mysql_instance} | \
+    local innodb_data_file=$(${my_print_defaults} ${my_print_defaults_opts} | \
 	grep innodb_data_file)
 
     local mysql_bkp="${mysqladmin}
@@ -488,7 +489,7 @@ function do_binary_backup() {
 
 
 function get_logs_dir() {
-    RET=$(${my_print_defaults} mysqld ${mysql_instance} | ${awk} -F= \
+    RET=$(${my_print_defaults} ${my_print_defaults_opts} | ${awk} -F= \
 	'{if($1~/^--(log_bin|relay_log)/){o[$1]=$2}}END{for(k in o){print o[k]}}')
 }
 
