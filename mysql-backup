@@ -350,10 +350,23 @@ EOF
     ${lvdisplay} -c | grep -F ${lvm_snapshot} > /dev/null 2>&1
     # remove existing mounts
     if test $? -eq 0; then
-	cmd ${umount} ${TARGET_MOUNT} ${quiet}
+	mounted_on=$(df -P ${TARGET_MOUNT} |  awk '{if(NF==6){print $NF}}')
+	if test "${mounted_on}" = "${TARGET_MOUNT}"; then
+	   cmd ${umount} ${TARGET_MOUNT} ${quiet}
+	   if test $? -ne 0; then
+	       msg="ERROR cannot umount ${TARGET_MOUNT} from previous backup"
+	       log ${msg}
+	       die ${msg}
+	   fi
+	fi
 	cmd ${lvremove} ${LVREMOVE_OPTS} ${lvm_snapshot} ${quiet}
+	if test $? -ne 0; then
+	    msg="ERROR cannot remove LVM snapshot  ${lvm_snapshot} from previous backup"
+	    log ${msg}
+	    die ${msg}
+	fi
     fi
-
+    
     run_hook pre_snapshot_backup_lvm_snaphost_hook
 
     mysql_query=$(cat <<EOF
