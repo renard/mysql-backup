@@ -2,7 +2,7 @@
 
 # mysql-backup --- Backup mysql databases
 # Copyright © 2010 Sébastien Gross <seb•ɑƬ•chezwam•ɖɵʈ•org>
-# Last changed: 2014-07-29 14:29:57
+# Last changed: 2014-07-29 15:13:13
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -108,6 +108,8 @@ cli_dump=
 cli_snapshot=
 
 quiet="> /dev/null 2>&1"
+
+lock_file="/tmp/${host}_bkp.lock"
 
 
 RET=
@@ -546,6 +548,11 @@ function do_dump_backup() {
 
 
 function do_backup () {
+    if test -e "${lock_file}"; then
+	msg="ERROR Lock file exists since `stat -c %y ${lock_file}`"
+	log ${msg}
+	die ${msg}
+    fi
     test -z "${dry_run}" && log "DAILY backup start."
 
     do_snapshot
@@ -567,6 +574,8 @@ function do_backup () {
 
     remove_snapshot
     test -z "${dry_run}" && log "DAILY backup finish."
+    
+    rm -f "${lock_file}"
 }
 
 
