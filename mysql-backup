@@ -2,7 +2,7 @@
 
 # mysql-backup --- Backup mysql databases
 # Copyright © 2010 Sébastien Gross <seb•ɑƬ•chezwam•ɖɵʈ•org>
-# Last changed: 2014-03-07 11:35:32
+# Last changed: 2014-07-29 14:29:57
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -151,29 +151,23 @@ function usage() {
     exit_code=${1:-1}
     cat <<EOF
 mysql-backup Version ${VERSION}
-Copyright © 2010 Sébastien Gross <seb•ɑƬ•chezwam•ɖɵʈ•org>
+Copyright © 2010-2014 Sébastien Gross <seb•ɑƬ•chezwam•ɖɵʈ•org>
 
-$0 [ options ] command [ command options ]
+$0 [ options | commands ]
 
 Options:
 
   -c|--config   CONF   The configuration file to use instead of default.
   -v|--verbose         Run in verbose mode.
+     --dry-run         Only print what would be done.
   -h|--help            This help screen.
 
-Commands:
+Mandatory commands:
 
-  dump               Do a dump backups
-    --dry-run          Only print what would be done.
+  -s|--snapshot        Do a LVM snapshot.
+  -d|--dump            Do a text dump backup.
 
-  restore            Restore a backup
-    --dry-run          Only print what would be done.
-    --date      DATE   Restore backup for a given date.
-    --bases     BASES  Restore backup for a given set of bases.
-
-  snapshot           Do a LVM snapshot
-    --dry-run          Only print what would be done.
-    --no-archive       Just snapshot, do not archive.
+  At least either snapshot or dump must be provided.
 EOF
     exit ${exit_code}
 }
