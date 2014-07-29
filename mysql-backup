@@ -544,10 +544,20 @@ function do_dump_backup() {
 }
 
 
-
+function check_for_locked_queries() {
+    locked=$(${mysql_cli} --socket="${socket}" -e 'SELECT * FROM information_schema.PROCESSLIST WHERE DB IS NOT NULL AND TIME > 0' | wc -l)
+    if test ${locked} -gt 0; then
+	msg="ERROR ${locked} locked queries"
+	log ${msg}
+	if test -z "${dry_run}"; then
+	    die ${msg}
+	fi
+    fi
+}
 
 
 function do_backup () {
+    check_for_locked_queries
     if test -e "${lock_file}"; then
 	msg="ERROR Lock file exists since `stat -c %y ${lock_file}`"
 	log ${msg}
