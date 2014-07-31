@@ -2,7 +2,7 @@
 
 # mysql-backup --- Backup mysql databases
 # Copyright © 2010 Sébastien Gross <seb•ɑƬ•chezwam•ɖɵʈ•org>
-# Last changed: 2014-07-29 15:13:13
+# Last changed: 2014-07-31 13:15:59
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,6 +16,14 @@
 
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+trap atexit EXIT HUP INT QUIT PIPE TERM
+
+function atexit () {
+    stop_mysqld_for_backup
+    remove_snapshot
+}
+
 
 VERSION="2.0"
 
