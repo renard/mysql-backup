@@ -2,7 +2,7 @@
 
 # mysql-backup --- Backup mysql databases
 # Copyright © 2010 Sébastien Gross <seb•ɑƬ•chezwam•ɖɵʈ•org>
-# Last changed: 2014-07-31 13:15:59
+# Last changed: 2014-07-31 14:08:55
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -678,7 +678,7 @@ fi
 
 backup_dir="${BACKUP_DIR}/${HOST}"
 backup_log="/var/log/mysql-backup/${HOST}.log"
-lock_file="/tmp/${mysq_instance}_bkp.lock"
+lock_file="/tmp/${mysql_instance}_bkp.lock"
 
 build_mysql_cli
 build_mysqldump_cli
