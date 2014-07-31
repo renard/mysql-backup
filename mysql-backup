@@ -109,7 +109,6 @@ cli_snapshot=
 
 quiet="> /dev/null 2>&1"
 
-lock_file="/tmp/${host}_bkp.lock"
 
 
 RET=
@@ -406,7 +405,8 @@ function remove_snapshot () {
 function start_mysqld_for_backup() {
     local innodb_data_file=$(${my_print_defaults} ${my_print_defaults_opts} | \
 	grep innodb_data_file)
-    local mysql_bkp="${mysqld} --read-only --skip-networking ${innodb_data_file} \
+    local mysql_bkp="${mysqld} --defaults-file=${defaults_file} \
+        --read-only --skip-networking ${innodb_data_file} \
 	--datadir=${TARGET_MOUNT}/${datadir_path} \
 	--skip-slave-start --socket=/tmp/${mysql_instance}.sock \
 	--pid=/tmp/${mysql_instance}.pid \
@@ -434,13 +434,19 @@ function start_mysqld_for_backup() {
 }
 
 function stop_mysqld_for_backup() {
-    local innodb_data_file=$(${my_print_defaults} ${my_print_defaults_opts} | \
-	grep innodb_data_file)
-
-    local mysql_bkp="${mysqladmin}
+    local mysql_cmd="${mysqladmin} \
         --defaults-extra-file="${mysqladmin_extra_file}" \
-	--socket=/tmp/${mysql_instance}.sock shutdown"
-    cmd $mysql_bkp
+	--socket=/tmp/${mysql_instance}.sock"
+    for i in `seq 60`; do
+	sleep 1
+	cmd "$mysql_cmd shut"
+	cmd "$mysql_cmd ping >/dev/null 2>&1"
+        ec=$?
+	if test $ec -ne 0; then
+	    break
+	fi
+    done
+    set +x
 }
 
 
@@ -578,10 +584,11 @@ function check_for_locked_queries() {
 function do_backup () {
     check_for_locked_queries
     if test -e "${lock_file}"; then
-	msg="ERROR Lock file exists since `stat -c %y ${lock_file}`"
+	msg="ERROR Lock file ${lock_file} exists since `stat -c %y ${lock_file}`"
 	log ${msg}
 	die ${msg}
     fi
+    touch "${lock_file}"
     test -z "${dry_run}" && log "DAILY backup start."
 
     do_snapshot
@@ -640,6 +647,7 @@ fi
 
 backup_dir="${BACKUP_DIR}/${HOST}"
 backup_log="/var/log/mysql-backup/${HOST}.log"
+lock_file="/tmp/${mysq_instance}_bkp.lock"
 
 build_mysql_cli
 build_mysqldump_cli
