@@ -314,7 +314,7 @@ function do_snapshot () {
     fi
     local mountpoint=$(df -P ${datadir} | awk '{if(NF==6){print $NF}}')
     local datadir_dev=$(df -P ${datadir} | awk '{if(NF==6){print $1}}' \
-	| xargs ${lvdisplay} -c  | cut -d: -f1)
+	| xargs ${lvdisplay} -c  | cut -d: -f1 | sed 's,^[[:space:]]*/,/,')
 
     if test -z "${datadir}"; then
 	die "LVM not installed or LVM commands not found or ${datadir} is not in LVM."
