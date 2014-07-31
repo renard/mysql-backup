@@ -404,8 +404,26 @@ EOF
 
 
 function remove_snapshot () {
-    cmd ${umount} ${TARGET_MOUNT} ${quiet}
-    cmd ${lvremove} ${LVREMOVE_OPTS} ${lvm_snapshot} ${quiet}
+    mounted_on=$(df -P ${TARGET_MOUNT} |  awk '{if(NF==6){print $NF}}')
+    if test "$mounted_on" = "${TARGET_MOUNT}"; then
+	cmd ${umount} ${TARGET_MOUNT} ${quiet}
+	if test $? -ne 0; then
+	    msg="ERROR cannot umount ${TARGET_MOUNT}"
+	    log ${msg}
+	    die ${msg}
+	fi
+    fi
+
+    if test -n "${lvm_snapshot}"; then
+	if test -e "${lvm_snapshot}"; then
+	    cmd ${lvremove} ${LVREMOVE_OPTS} ${lvm_snapshot} ${quiet}
+	    if test $? -ne 0; then
+		msg="ERROR could not remove LVM snapshot ${lvm_snapshot}"
+		log ${msg}
+		die ${msg}
+	    fi
+	fi
+    fi
 }
 
 
