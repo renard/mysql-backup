@@ -460,6 +460,9 @@ function start_mysqld_for_backup() {
 }
 
 function stop_mysqld_for_backup() {
+    if ! test -e /tmp/${mysql_instance}.sock; then
+	return
+    fi
     local mysql_cmd="${mysqladmin} \
         --defaults-extra-file="${mysqladmin_extra_file}" \
 	--socket=/tmp/${mysql_instance}.sock"
@@ -469,10 +472,12 @@ function stop_mysqld_for_backup() {
 	cmd "$mysql_cmd ping >/dev/null 2>&1"
         ec=$?
 	if test $ec -ne 0; then
-	    break
+	    return
 	fi
     done
-    set +x
+    msg="ERROR Could not stop mysql instance ${mysql_instance}"
+    log ${msg}
+    die ${msg}
 }
 
 
