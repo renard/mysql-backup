@@ -177,6 +177,12 @@ EOF
 # Build mysql command line
 function build_mysql_cli() {
     RET="${mysql}"
+    # Missing: "databases", "execute", "pipe", "socket"
+    for v in defaults-extra-file; do
+	V=${v//-/_}
+	test -z "${!V}" || RET="${RET} --${v}=${!V}"
+    done
+
     # Missing: "help", "table", "version"
     for v in auto-rehash batch column-names column-type-info comments \
 	compress debug-check debug-info disable-named-commands force \
