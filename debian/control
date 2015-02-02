@@ -8,7 +8,7 @@ Homepage: http://git-hub.com/renard/mysql-backup
 
 Package: mysql-backup
 Architecture: all
-Depends: ${shlibs:Depends}, ${misc:Depends}, mysql-client,
+Depends: ${shlibs:Depends}, ${misc:Depends}, mariadb-client | mysql-client,
 	  debianutils (>= 2.30), adduser
 Suggests: gzip, bzip2, xz-utils
 Description: MySQL database backup tool
