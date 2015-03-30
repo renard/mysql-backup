@@ -642,7 +642,7 @@ function do_backup () {
     remove_snapshot
     test -z "${dry_run}" && log "DAILY backup finish."
     
-    rm -f "${lock_file}"
+    cmd rm -f "${lock_file}"
 }
 
 
