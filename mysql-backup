@@ -117,7 +117,7 @@ cli_snapshot=
 
 quiet="> /dev/null 2>&1"
 
-
+my_pid=$$
 
 RET=
 
@@ -136,12 +136,12 @@ function die() {
 function log() {
     d=$(dirname "${backup_log}")
     test -d "${d}" || mkdir "${d}"
-    test -z "${dry_run}" &&  echo "$(date +'%F %T') $*" >> "${backup_log}"
-    test -n "${cli_verbose}" && echo "$(date +'%F %T') $*"
+    test -z "${dry_run}" &&  echo "$(date +'%F %T') $my_pid $*" >> "${backup_log}"
 }
 
 function cmd() {
-    test -n "${cli_verbose}" -o -n "${dry_run}" && echo "$*"
+    test -n "${dry_run}" && echo "$*"
+    test -n "${cli_verbose}" && log "$*"
     test -z "${dry_run}" && eval "$*"
 }
 
