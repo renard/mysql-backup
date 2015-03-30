@@ -529,10 +529,10 @@ function do_binary_backup() {
     cmd "${tar} ${tar_opts} -C ${TARGET_MOUNT}/${datadir_path} -c -f - . | \
       ${compression_cli} ${compression_opts} > ${bkp_dir}/daily/${snapshot_file}"
     if test $? -eq 0; then
-	test -z "${dry_run}" && log "DAILY snapshot done."
+	test -z "${dry_run}" && log "DAILY binary backup done."
     else
-	test -z "${dry_run}" && log "DAILY snapshot failed."
-	echo "DAILY snapshot failed."
+	test -z "${dry_run}" && log "DAILY binary backup failed."
+	echo "DAILY binary backup failed."
     fi
 
     archive_bkps "${bkp_dir}" "${snapshot_file}" "Snapshot $HOST"
@@ -556,7 +556,7 @@ function do_dump_backup() {
 
     find_db
 
-    test -z "${dry_run}" && log "DAILY dump start."
+    test -z "${dry_run}" && log "DAILY mysqldump backup start."
 
     for db in ${DATABASES}; do
 	for t in daily weekly monthly; do
@@ -595,7 +595,7 @@ function do_dump_backup() {
 
     archive_bkps "${bkp_dir}" "${backup_file}" "Dump $HOST"
 
-    test -z "${dry_run}" && log "DAILY dump finished."
+    test -z "${dry_run}" && log "DAILY mysqldump backup finished."
 
 }
 
