@@ -38,7 +38,7 @@ Features:
 
 --dry-run::
 
-  Run un *dry-run* mode, do not perform any action.
+  Run in *dry-run* mode, do not perform any action.
 
 --dump, -d::
 
