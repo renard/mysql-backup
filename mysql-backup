@@ -2,7 +2,7 @@
 
 # mysql-backup --- Backup mysql databases
 # Copyright © 2010 Sébastien Gross <seb•ɑƬ•chezwam•ɖɵʈ•org>
-# Last changed: 2016-05-02 10:51:50
+# Last changed: 2017-02-20 10:05:51
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -389,13 +389,13 @@ EOF
     run_hook pre_snapshot_backup_lvm_snaphost_hook
 
     mysql_query=$(cat <<EOF
-SLAVE STOP;
+STOP SLAVE;
 FLUSH TABLES WITH READ LOCK;
 system ${mysql_cli} --socket="${socket}" --column-names -e "SHOW MASTER STATUS\G" > ${datadir}/show-master-status
 system ${mysql_cli} --socket="${socket}" --column-names -e "SHOW SLAVE STATUS\G" > ${datadir}/show-slave-status
 system ${lvcreate} -s --size ${LVM_SNAPSHOT_SIZE} -n ${lvm_snapshot} ${LVCREATE_OPTS} ${datadir_dev} > /dev/null 2>&1
 UNLOCK TABLES;
-SLAVE START;
+START SLAVE;
 EOF
     )
 
