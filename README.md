@@ -5,7 +5,7 @@ header: User manual
 footer: mysql-backup
 author:
   - Sébastien Gross  &lt;seb•ɑƬ•chezwam•ɖɵʈ•org&gt; (**@renard_0**)
-date: 2016-05-02 14:58:20
+date: 2017-10-02 19:56:04
 adjusting: b
 hyphenate: yes
 ---
@@ -130,6 +130,35 @@ and an instance specific configuration in (*/etc/mysql-backup/instance00.cnf*):
 And a cron such as:
 
     01 00 * * * root mysql-backup -c /etc/mysql-backup/instance00.cnf --snapshot
+
+SUFFIX
+: Suffix to *datadir_path* when creating a snapshot backup. You can safely
+  leave it empty if you are using default mysql configuration. If you are
+  using your own layout you should use this option.
+
+EXAMPLE: If your layout is something like that:
+
+     /var/lib/mysql/db_00
+	 |-- binlog
+     |-- config
+     |   |-- conf.d
+     |   |   `-- mysql-multi.cnf
+     |   |-- debian.cnf
+     |   |-- my.cnf
+     |   `-- mysql-backup.cnf
+     |-- data
+     |   |-- aria_log.00000001
+     |   |-- aria_log_control
+	 |   |-- mysql
+     |   |-- relay-log.info
+     |   |-- show-master-status
+     |   `-- show-slave-status
+     |-- log
+     |-- mysql-multi.txt
+     `-- tmp
+
+*datadir_path* is pointing to */var/lib/mysql/db_00/data* but you also want
+to backup other files so you have to set *SUFFIX* to *..*.
 
 ### Archive options
 
@@ -298,6 +327,7 @@ nonsense.
 - Enhance log messages.
 - Enhance launch of temporary mysql instance.
 - Add support for [pigz](http://zlib.net/pigz/).
+- Add SUFFIX option for multi-instance mysql backup.
 
 ## Version 2.2
 
@@ -334,6 +364,6 @@ user's assumption.
 
 # COPYRIGHT
 
-Copyright © 2010-2014 Sébastien Gross \<seb•ɑƬ•chezwam•ɖɵʈ•org>.
+Copyright © 2010-2017 Sébastien Gross \<seb•ɑƬ•chezwam•ɖɵʈ•org>.
 
 Released under [GNU GPL version 3 or higher](http://www.gnu.org/licenses/gpl.html).
