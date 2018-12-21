@@ -341,19 +341,6 @@ function do_snapshot () {
 
     local mysql_query=
 
-    local no_archive=
-
-    while test $# -ne 0; do
-	case "$1" in
-	    --dry-run) dry_run=1 ;;
-	    --no-archive) no_archive=1;;
-	    --) shift ; break ;;
-	    -*|*) help 0 ;;
-	esac
-	shift
-    done
-
-
     if test -n "${dry_run}"; then
 	cat<<EOF
 datadir       = ${datadir}
