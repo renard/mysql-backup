@@ -2,7 +2,7 @@
 
 # mysql-backup --- Backup mysql databases
 # Copyright © 2010 Sébastien Gross <seb•ɑƬ•chezwam•ɖɵʈ•org>
-# Last changed: 2018-12-21 15:12:33
+# Last changed: 2018-12-21 16:55:39
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -523,6 +523,7 @@ function start_mysqld_for_backup() {
     # test if new mysql instance can be reached.
     for i in `seq 600`; do
 	sleep 1
+	log "Try $i/600..."
 	cmd "${mysqladmin} \
             --defaults-extra-file='${mysqladmin_extra_file}' \
             --socket=/tmp/${mysql_instance}.sock ping > /dev/null 2>&1"
@@ -532,12 +533,20 @@ function start_mysqld_for_backup() {
 	# else
 	#     echo " $i $ec"
 	fi
+	# Give mysql a try...
+	if test $i -gt 120; then 
+	    if ! test -e /tmp/${mysql_instance}.pid; then
+		log "PID file not found, could not start MySQL properly."
+		break
+	    fi
+	fi
     done
     log "Could not access to mysql after 600s. Something went wrong"
     stop_mysqld_for_backup
     remove_snapshot
     test -z "${dry_run}" && log "DAILY backup failled."
     cmd rm -f "${lock_file}"
+    die "Backup failed"
 }
 
 function stop_mysqld_for_backup() {
