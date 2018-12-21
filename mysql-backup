@@ -51,6 +51,8 @@ LVCREATE_OPTS="--chunksize=256"
 LVREMOVE_OPTS="-f"
 TARGET_MOUNT="/tmp/mysql-snapshot"
 
+ZFS_SNAPSHOT="BACKUP"
+
 # Dump hooks
 pre_dump_backup_hook=
 post_dump_backup_hook=
@@ -397,7 +399,6 @@ function do_snapshot_zfs () {
     local mountpoint="${2}"
 
     local datadir_dev=$(df -P ${datadir} | awk '{if(NF==6){print $1}}')
-    local zfs_snapshot="BACKUP"
 
     datadir_path=$(python -c "import os; print(os.path.realpath('${datadir}'))" | sed -e "s,^${mountpoint}/\?,,")
 
@@ -409,13 +410,15 @@ STOP SLAVE;
 FLUSH TABLES WITH READ LOCK;
 system ${mysql_cli} --socket="${socket}" --column-names -e "SHOW MASTER STATUS\G" > ${datadir}/show-master-status
 system ${mysql_cli} --socket="${socket}" --column-names -e "SHOW SLAVE STATUS\G" > ${datadir}/show-slave-status
-system  zfs snapshot $datadir_dev@${zfs_snapshot} > /dev/null 2>&1
+system  zfs snapshot $datadir_dev@${ZFS_SNAPSHOT} > /dev/null 2>&1
 UNLOCK TABLES;
 START SLAVE;
 EOF
     )
     cmd "echo '${mysql_query}' | ${mysql_cli} --socket=\"${socket}\""
-    cmd zfs clone -o mountpoint=$TARGET_MOUNT $datadir_dev@${zfs_snapshot} ${datadir_dev}_${zfs_snapshot}
+
+    cmd zfs clone -o mountpoint=$TARGET_MOUNT $datadir_dev@${ZFS_SNAPSHOT} ${datadir_dev}_${ZFS_SNAPSHOT}
+
     
     run_hook post_snapshot_backup_zfs_snaphost_hook
     run_hook post_snapshot_backup_hook
