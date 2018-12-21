@@ -402,6 +402,13 @@ function do_snapshot_zfs () {
 
     datadir_path=$(python -c "import os; print(os.path.realpath('${datadir}'))" | sed -e "s,^${mountpoint}/\?,,")
 
+    cmd zfs get -H type $datadir_dev@${ZFS_SNAPSHOT} $quiet
+    if test $? -eq 0; then
+	msg="$datadir_dev@${ZFS_SNAPSHOT} exists. This is not good."
+	log "$msg"
+	die "$msg"
+    fi
+    
     run_hook pre_snapshot_backup_hook
     run_hook pre_snapshot_backup_zfs_snaphost_hook
 
@@ -419,6 +426,11 @@ EOF
 
     cmd zfs clone -o mountpoint=$TARGET_MOUNT $datadir_dev@${ZFS_SNAPSHOT} ${datadir_dev}_${ZFS_SNAPSHOT}
 
+    if test $? -ne 0; then
+	msg "Couldn't clone ${datadir_dev}@${ZFS_SNAPSHOT} to ${datadir_dev}_${ZFS_SNAPSHOT}."
+	log $msg
+	die $msg
+    fi
     
     run_hook post_snapshot_backup_zfs_snaphost_hook
     run_hook post_snapshot_backup_hook
