@@ -5,7 +5,7 @@ header: User manual
 footer: mysql-backup
 author:
   - Sébastien Gross  &lt;seb•ɑƬ•chezwam•ɖɵʈ•org&gt; (**@renard_0**)
-date: 2017-10-02 19:56:04
+date: 2019-01-04 11:18:59
 adjusting: b
 hyphenate: yes
 ---
@@ -50,10 +50,11 @@ Features:
 : Do a *mysqldump* backup.
 
 --snapshot, -s
-: Perform a binary backup using *lvm* snapshot.
+: Perform a binary backup using *lvm* or *zfs* snapshot.
 
 
-NOTE: To restore a LVM snapshot you just need to untar the archive.
+NOTE: To restore a *LVM* or *ZFS* snapshot you just need to untar the
+archive.
 
 
 # CONFIGURATION FILE
@@ -214,6 +215,11 @@ TARGET_MOUNT
 : Where to mount the LVM snapshot before archiving the data (Default:
   "/tmp/mysql-snapshot").
 
+### ZFS Options
+
+There are no *ZFS* option. mysql-backup use ZFS by default if it detects
+mysql is running on a *ZFS* volume.
+
 ### Hooks
 
 Hooks are scripts that can be run via run-parts(8). Each hook parameter
@@ -253,8 +259,27 @@ rebuild of innodb journal and indexes. Then the archive process is run
 NOTE: For big databases you'd better want to use a snapshot backup since the
 archive process would be faster and the restoration either.
 
-Once every backup are done, the *lvm* snapshot is removed.
+Once every backup are done, the *lvm*/*zfs* snapshot is removed.
 
+## Performances
+
+For better performances, it is advised to run mysql-backup on a dedicated
+backup server instead of production, especially if you are using pigs(1).
+
+*ZFS* offers better performances than *LVM*. You might also want to use the
+*ZFS* compression features to drastically reduce the IOs.
+
+As an example backing up 10 mysql database representing about 760Gb took
+almost one day using *LVM*. The server had a lot of harddrive IOwait. The
+very same hardware was used to perform backups on *ZFS* volumes using
+compression allowed to raise the mysql instances to 24. The hard drive usage
+drops to 250Gb thanks to *ZFS* compression. The whole backup process took
+less than 2 hours.
+
+On the mysql-backup instances you also want to totally disable binary
+logs. Use `skip_log_bin=1` and `log_slave_update=0` for that purpose.
+
+If you are using pigz(1) avoid running several backups in parallel.
 
 # Restoration procedure
 
@@ -303,6 +328,12 @@ pre_snapshot_backup_lvm_snaphost_hook
 post_snapshot_backup_lvm_snaphost_hook
 : Hook to be run after the LVM snapshot is done.
 
+pre_snapshot_backup_zfs_snaphost_hook
+: Hook to be run before the ZFS snapshot is started.
+
+post_snapshot_backup_zfs_snaphost_hook
+: Hook to be run after the ZFS snapshot is done.
+
 pre_snapshot_backup_archive_hook
 : Hook to be run before the archive process is started.
 
@@ -316,12 +347,19 @@ nonsense.
 
 - mysql(1)
 - mysqldump(1)
-- gzip(1), bzip2(1), xz(1)
+- gzip(1), bzip2(1), xz(1), pigz(1)
 - run-parts(8)
 
 # HISTORY
 
-## Version XX
+
+## Version 2.4
+
+2019-01-04:
+
+- Add ZFS support
+
+## Version 2.3
 
 - Add PID to log entries.
 - Enhance log messages.
