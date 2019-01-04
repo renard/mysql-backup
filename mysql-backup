@@ -633,6 +633,8 @@ function do_binary_backup() {
     done
 
     test -z "${dry_run}" && log "DAILY snapshot start"
+    cmd "cp /tmp/${mysql_instance}.log ${TARGET_MOUNT}/backup.log"
+    cmd "cp /tmp/${mysql_instance}-stdout.log ${TARGET_MOUNT}/backup-stdout.log"
     cmd "${tar} ${tar_opts} -C ${TARGET_MOUNT}/${datadir_path}/${SUFFIX} -c -f - . | \
       ${compression_cli} ${compression_opts} > ${bkp_dir}/daily/${snapshot_file}"
     if test $? -eq 0; then
