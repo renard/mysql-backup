@@ -506,14 +506,16 @@ function remove_snapshot () {
 
 function start_mysqld_for_backup() {
     local innodb_data_file=$(${my_print_defaults} ${my_print_defaults_opts} | \
-	grep innodb_data_file)
+				 grep innodb_data_file)
+    rm -f /tmp/${mysql_instance}.log /tmp/${mysql_instance}-stdout.log
     local mysql_bkp="${mysqld} --defaults-file=${defaults_file} \
         --read-only --skip-networking ${innodb_data_file} \
 	--datadir=${TARGET_MOUNT}/${datadir_path} \
 	--skip-slave-start --socket=/tmp/${mysql_instance}.sock \
 	--pid=/tmp/${mysql_instance}.pid \
 	--skip-log-bin \
-	--log-error=/tmp/${mysql_instance}.log > /dev/null 2>&1 &"
+	--innodb-flush-method=fsync \
+	--log-error=/tmp/${mysql_instance}.log > /tmp/${mysql_instance}-stdout.log 2>&1 &"
 
     cmd $mysql_bkp
 
