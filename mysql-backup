@@ -2,7 +2,7 @@
 
 # mysql-backup --- Backup mysql databases
 # Copyright © 2010 Sébastien Gross <seb•ɑƬ•chezwam•ɖɵʈ•org>
-# Last changed: 2018-12-21 18:00:53
+# Last changed: 2019-01-04 11:16:02
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -25,7 +25,7 @@ function atexit () {
 }
 
 
-VERSION="2.2"
+VERSION="2.4"
 
 # Default values just in case of...
 
