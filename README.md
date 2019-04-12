@@ -5,7 +5,7 @@ header: User manual
 footer: mysql-backup
 author:
   - Sébastien Gross  &lt;seb•ɑƬ•chezwam•ɖɵʈ•org&gt; (**@renard_0**)
-date: 2019-01-04 11:18:59
+date: 2019-04-12 10:39:19
 adjusting: b
 hyphenate: yes
 ---
@@ -16,7 +16,7 @@ mysql-backup - Backup MySQL databases.
 
 # SYNOPSIS
 
-mysql-backup [ options ] [ --dump | --snapshot ]
+mysql-backup [ options ] [ --dump | --snapshot | --check ]
 
 # DESCRIPTION
 
@@ -52,6 +52,8 @@ Features:
 --snapshot, -s
 : Perform a binary backup using *lvm* or *zfs* snapshot.
 
+--check, -C
+: Do a nagios comptatible check (See MONITORING below).
 
 NOTE: To restore a *LVM* or *ZFS* snapshot you just need to untar the
 archive.
@@ -342,6 +344,26 @@ post_snapshot_backup_archive_hook
 
 NOTE: There is no database postfix for snapshot hooks since there would be
 nonsense.
+
+# MONITORING
+
+Performing a nagios-like check allow to make sure that backups are done
+regulary. For this purpose it will test if the lock file is neither present
+nor older than 24h and check if the last backup is not older than 24h. Those
+values are hardcoded because in most of cases it makes no sense to do eithe
+more or less than one backup per day.
+
+If you are using NRPE (allowing arguments) you can add this in you
+configuration file:
+
+    command[check_mysql_backup] = sudo /usr/local/bin/mysql-backup --check -c $ARG1$
+
+If you don't allow arguments you need to define one check per backup instance.
+
+Do not forget the sudo line:
+
+    nagios ALL=(mysql) NOPASSWD:/usr/local/bin/mysql-backup --check -c *
+
 
 # SEE ALSO
 
