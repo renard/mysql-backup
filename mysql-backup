@@ -2,7 +2,7 @@
 
 # mysql-backup --- Backup mysql databases
 # Copyright © 2010 Sébastien Gross <seb•ɑƬ•chezwam•ɖɵʈ•org>
-# Last changed: 2019-01-04 11:16:02
+# Last changed: 2019-04-12 10:18:27
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -100,6 +100,7 @@ tar_opts=""
 # Useful variables
 mysql_cli=
 mysqldump_cli=
+check_cli=
 compression_cli=
 extract_cli=
 backup_extension=
@@ -111,6 +112,13 @@ mysqladmin_extra_file=
 backup_timestamp=$(date +%F)
 this_week_day=$(date +%w)
 this_month_day=$(date +%d)
+
+# Nagios checks
+NAGIOS_OK=0
+NAGIOS_WARNING=1
+NAGIOS_CRITICAL=2
+NAGIOS_UNKNOWN=3
+
 
 # Command line options
 cli_config=
@@ -133,9 +141,11 @@ for f in /etc/mysql-backup/default.cnf ~/.mysql-backup.cnf .mysql-backup.cnf; do
 done
 
 function die() {
-  echo "$@" >&2
-  exit 1
+  echo "$1" >&2
+  exit "${2:-1}"
 }
+
+
 
 function log() {
     d=$(dirname "${backup_log}")
@@ -179,6 +189,7 @@ Mandatory commands:
 
   -s|--snapshot        Do a LVM snapshot.
   -d|--dump            Do a text dump backup.
+  -C|--check           Do a nagios compatible check.
 
   At least either snapshot or dump must be provided.
 EOF
@@ -360,15 +371,15 @@ EOF
 	   cmd ${umount} ${TARGET_MOUNT} ${quiet}
 	   if test $? -ne 0; then
 	       msg="ERROR cannot umount ${TARGET_MOUNT} from previous backup"
-	       log ${msg}
-	       die ${msg}
+	       log "${msg}"
+	       die "${msg}"
 	   fi
 	fi
 	cmd ${lvremove} ${LVREMOVE_OPTS} ${lvm_snapshot} ${quiet}
 	if test $? -ne 0; then
 	    msg="ERROR cannot remove LVM snapshot  ${lvm_snapshot} from previous backup"
-	    log ${msg}
-	    die ${msg}
+	    log "${msg}"
+	    die "${msg}"
 	fi
     fi
     
@@ -429,8 +440,8 @@ EOF
 
     if test $? -ne 0; then
 	msg "Couldn't clone ${datadir_dev}@${ZFS_SNAPSHOT} to ${datadir_dev}_${ZFS_SNAPSHOT}."
-	log $msg
-	die $msg
+	log "${msg}"
+	die "${msg}"
     fi
     
     run_hook post_snapshot_backup_zfs_snaphost_hook
@@ -462,8 +473,8 @@ function remove_snapshot_lvm () {
 	cmd ${umount} ${TARGET_MOUNT} ${quiet}
 	if test $? -ne 0; then
 	    msg="ERROR cannot umount ${TARGET_MOUNT}"
-	    log ${msg}
-	    die ${msg}
+	    log "${msg}"
+	    die "${msg}"
 	fi
     fi
 
@@ -472,8 +483,8 @@ function remove_snapshot_lvm () {
 	    cmd ${lvremove} ${LVREMOVE_OPTS} ${lvm_snapshot} ${quiet}
 	    if test $? -ne 0; then
 		msg="ERROR could not remove LVM snapshot ${lvm_snapshot}"
-		log ${msg}
-		die ${msg}
+		log "${msg}"
+		die "${msg}"
 	    fi
 	fi
     fi
@@ -482,8 +493,8 @@ function remove_snapshot_lvm () {
 function remove_snapshot_zfs () {
     if test "$mounted_on" != "${TARGET_MOUNT}"; then
 	msg="ERROR $mysql_instance mount is not ${TARGET_MOUNT}"
-	log ${msg}
-	die ${msg}
+	log "${msg}"
+	die "${msg}"
     fi
     mount_dev=$(df -P ${TARGET_MOUNT} |  awk '{if(NF==6){print $1}}')
     snapshot=$(zfs get -H -o value origin $mount_dev)
@@ -583,8 +594,8 @@ function stop_mysqld_for_backup() {
 	fi
     done
     msg="ERROR Could not stop mysql instance ${mysql_instance}"
-    log ${msg}
-    die ${msg}
+    log "${msg}"
+    die "${msg}"
 }
 
 
@@ -713,9 +724,9 @@ function check_for_locked_queries() {
     locked=$(${mysql_cli} --socket="${socket}" -e 'SELECT * FROM information_schema.PROCESSLIST WHERE DB IS NOT NULL AND TIME > 10' | wc -l)
     if test ${locked} -gt 0; then
 	msg="ERROR ${locked} locked queries"
-	log ${msg}
+	log "${msg}"
 	if test -z "${dry_run}"; then
-	    die ${msg}
+	    die "${msg}"
 	fi
     fi
 }
@@ -725,8 +736,8 @@ function do_backup () {
     check_for_locked_queries
     if test -e "${lock_file}"; then
 	msg="ERROR Lock file ${lock_file} exists since `stat -c %y ${lock_file}`"
-	log ${msg}
-	die ${msg}
+	log "${msg}"
+	die "${msg}"
     fi
     touch "${lock_file}"
     test -z "${dry_run}" && log "DAILY backup start."
@@ -755,12 +766,31 @@ function do_backup () {
 }
 
 
+function do_check() {
+    # Check for lock
+    if test -e ${lock_file}; then
+	local _count=$(find ${lock_file} -type f -mtime +1| wc -l)
+	if test $_count -gt 0; then
+	    local _time=$(stat --printf="%y" ${lock_file} | cut -d. -f 1)
+	    die "Lock file ${lock_file} is more than 24h: ${_time}" $NAGIOS_CRITICAL
+	fi
+    fi
+    # Check for last backup
+    local _count=$(find ${backup_dir} -type f -mtime 0| wc -l)
+    if test $_count -eq 0; then
+	die "No backup for last 24h" $NAGIOS_CRITICAL
+    fi
+    die "No problem found" $NAGIOS_OK
+}
+
+
 
 # Parse the command line
 while test $# != 0; do
     case "$1" in
 	--dump|-d) cli_dump=1 ;;
 	--snapshot|-s) cli_snapshot=1 ;;
+	--check|-C) cli_check=1 ;;
         -c|--config)
             test -z "$2" && die "Need a parameter for $1."
             cli_config=$2
@@ -780,14 +810,18 @@ if test -r "${cli_config}"; then
     source "${cli_config}"
 fi
 
-if test -z "${cli_dump}" -a -z "${cli_snapshot}"; then
-    die "Either --dump or --snapshot must be provided."
+if test -z "${cli_dump}" -a -z "${cli_snapshot}" -a -z "${cli_check}"; then
+    die "Either --dump or --snapshot or --check must be provided."
 fi
 
 
 backup_dir="${BACKUP_DIR}/${HOST}"
 backup_log="/var/log/mysql-backup/${HOST}.log"
 lock_file="/tmp/${mysql_instance}_bkp.lock"
+
+if test -n "${cli_check}"; then
+    do_check
+fi
 
 build_mysql_cli
 build_mysqldump_cli
