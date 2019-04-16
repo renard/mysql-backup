@@ -5,7 +5,7 @@ header: User manual
 footer: mysql-backup
 author:
   - Sébastien Gross  &lt;seb•ɑƬ•chezwam•ɖɵʈ•org&gt; (**@renard_0**)
-date: 2019-04-12 10:39:19
+date: 2019-04-16 22:41:56
 adjusting: b
 hyphenate: yes
 ---
@@ -162,6 +162,11 @@ EXAMPLE: If your layout is something like that:
 
 *datadir_path* is pointing to */var/lib/mysql/db_00/data* but you also want
 to backup other files so you have to set *SUFFIX* to *..*.
+
+MYSQL_PING_TIMEOUT
+: Startup time given to mysql before declaring it non-functional (default
+  600s). This is used when starting mysql in the temporary directory before
+  creating the archive.
 
 ### Archive options
 
