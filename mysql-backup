@@ -2,7 +2,7 @@
 
 # mysql-backup --- Backup mysql databases
 # Copyright © 2010 Sébastien Gross <seb•ɑƬ•chezwam•ɖɵʈ•org>
-# Last changed: 2019-04-12 10:18:27
+# Last changed: 2019-04-16 09:49:58
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -52,6 +52,9 @@ LVREMOVE_OPTS="-f"
 TARGET_MOUNT="/tmp/mysql-snapshot"
 
 ZFS_SNAPSHOT="BACKUP"
+
+# time in seconds to try until mysql is up and running.
+MYSQL_PING_TIMEOUT=600
 
 # Dump hooks
 pre_dump_backup_hook=
@@ -142,6 +145,11 @@ done
 
 function die() {
   echo "$1" >&2
+  exit "${2:-1}"
+}
+
+function die_nagios() {
+  echo "$1"
   exit "${2:-1}"
 }
 
@@ -535,9 +543,9 @@ function start_mysqld_for_backup() {
     fi
 
     # test if new mysql instance can be reached.
-    for i in `seq 600`; do
+    for i in `seq ${MYSQL_PING_TIMEOUT}`; do
 	sleep 1
-	log "Try $i/600..."
+	log "Try $i/${MYSQL_PING_TIMEOUT}..."
 	cmd "${mysqladmin} \
             --defaults-extra-file='${mysqladmin_extra_file}' \
             --socket=/tmp/${mysql_instance}.sock ping > /dev/null 2>&1"
@@ -548,14 +556,14 @@ function start_mysqld_for_backup() {
 	#     echo " $i $ec"
 	fi
 	# Give mysql a try...
-	if test $i -gt 120; then 
+	if test $i -gt ${MYSQL_PING_TIMEOUT}; then 
 	    if ! test -e /tmp/${mysql_instance}.pid; then
 		log "PID file not found, could not start MySQL properly."
 		break
 	    fi
 	fi
     done
-    log "Could not access to mysql after 600s. Something went wrong"
+    log "Could not access to mysql after ${MYSQL_PING_TIMEOUT}s. Something went wrong"
     stop_mysqld_for_backup
     remove_snapshot
     test -z "${dry_run}" && log "DAILY backup failled."
@@ -772,15 +780,15 @@ function do_check() {
 	local _count=$(find ${lock_file} -type f -mtime +1| wc -l)
 	if test $_count -gt 0; then
 	    local _time=$(stat --printf="%y" ${lock_file} | cut -d. -f 1)
-	    die "Lock file ${lock_file} is more than 24h: ${_time}" $NAGIOS_CRITICAL
+	    die_nagios "Lock file ${lock_file} is more than 24h: ${_time}" $NAGIOS_CRITICAL
 	fi
     fi
     # Check for last backup
     local _count=$(find ${backup_dir} -type f -mtime 0| wc -l)
     if test $_count -eq 0; then
-	die "No backup for last 24h" $NAGIOS_CRITICAL
+	die_nagios "No backup for last 24h" $NAGIOS_CRITICAL
     fi
-    die "No problem found" $NAGIOS_OK
+    die_nagios "No problem found" $NAGIOS_OK
 }
 
 
