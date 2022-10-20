@@ -385,6 +385,7 @@ Do not forget the sudo line:
 2022-10-20:
 
 - Migrate help as comment
+- Do not run atexit is help is displayed
 
 ## Version 2.4
 

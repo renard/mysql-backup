@@ -207,6 +207,7 @@ function run_hook() {
 function usage() {
     exit_code=${1:-1}
     sed -e '1,/^### BEGIN HELP/d;/^### END HELP/,$d;s/^#\{1,\} \{0,1\}//' $0
+    trap - EXIT
     exit ${exit_code}
 }
 
