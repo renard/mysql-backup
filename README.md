@@ -5,9 +5,10 @@ header: User manual
 footer: mysql-backup
 author:
   - Sébastien Gross  &lt;seb•ɑƬ•chezwam•ɖɵʈ•org&gt; (**@renard_0**)
-date: 2019-04-16 22:41:56
+date: 2022-10-20 02:15:56
 adjusting: b
 hyphenate: yes
+Generate: pandoc -s -f markdown-smart -t man mysql-backup.1.md -o mysql-backup.1
 ---
 
 # NAME
@@ -379,6 +380,11 @@ Do not forget the sudo line:
 
 # HISTORY
 
+## Version 2.4.1
+
+2022-10-20:
+
+- Migrate help as comment
 
 ## Version 2.4
 

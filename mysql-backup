@@ -1,8 +1,34 @@
 #!/bin/bash
 
+### BEGIN HELP
 # mysql-backup --- Backup mysql databases
+#
+# mysql-backup Version 2.4.1
+#
+# Copyright © 2010-2022 Sébastien Gross <seb•ɑƬ•chezwam•ɖɵʈ•org>
+#
+# Usage:
+#
+#    mysql-backup [ options | commands ]
+#
+# Options:
+#
+#   -c|--config   CONF   The configuration file to use instead of default.
+#   -v|--verbose         Run in verbose mode.
+#      --dry-run         Only print what would be done.
+#   -h|--help            This help screen.
+#
+# Mandatory commands:
+#
+#   -s|--snapshot        Do a LVM snapshot.
+#   -d|--dump            Do a text dump backup.
+#   -C|--check           Do a nagios compatible check.
+#
+#   At least either snapshot or dump must be provided.
+### END HELP
+
 # Copyright © 2010 Sébastien Gross <seb•ɑƬ•chezwam•ɖɵʈ•org>
-# Last changed: 2019-05-23 11:10:20
+# Last changed: 2022-10-20 01:57:29
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -180,27 +206,7 @@ function run_hook() {
 
 function usage() {
     exit_code=${1:-1}
-    cat <<EOF
-mysql-backup Version ${VERSION}
-Copyright © 2010-2014 Sébastien Gross <seb•ɑƬ•chezwam•ɖɵʈ•org>
-
-$0 [ options | commands ]
-
-Options:
-
-  -c|--config   CONF   The configuration file to use instead of default.
-  -v|--verbose         Run in verbose mode.
-     --dry-run         Only print what would be done.
-  -h|--help            This help screen.
-
-Mandatory commands:
-
-  -s|--snapshot        Do a LVM snapshot.
-  -d|--dump            Do a text dump backup.
-  -C|--check           Do a nagios compatible check.
-
-  At least either snapshot or dump must be provided.
-EOF
+    sed -e '1,/^### BEGIN HELP/d;/^### END HELP/,$d;s/^#\{1,\} \{0,1\}//' $0
     exit ${exit_code}
 }
 
